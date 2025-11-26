@@ -309,21 +309,6 @@
         </profile>
 
         <profile>
-            <id>dev</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <!-- Core logic -->
-                <dependency>
-                    <groupId>io.levysworks</groupId>
-                    <artifactId>FleetCoreLib</artifactId>
-                    <version>1.0-SNAPSHOT</version>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <profile>
             <id>test</id>
         </profile>
     </profiles>
