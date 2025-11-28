@@ -126,6 +126,7 @@ public class CoreService {
         UUID droneUUID = dbDrone.getUuid();
 
         iotManager.detachCertificates(droneName);
+        iotManager.deleteCertificates(droneName);
 
         String groupARN = iotManager.getThingGroup(droneName);
 
