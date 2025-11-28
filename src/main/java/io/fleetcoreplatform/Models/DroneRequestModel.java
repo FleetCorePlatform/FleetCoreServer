@@ -5,4 +5,5 @@ public record DroneRequestModel(
         String droneName,
         String address,
         String px4Version,
-        String agentVersion) {}
+        String agentVersion,
+        DroneHomePositionModel homePosition) {}

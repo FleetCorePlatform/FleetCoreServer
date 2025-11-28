@@ -2,6 +2,8 @@ package io.fleetcoreplatform.Managers.Database.Mappers;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbDrone;
 import io.fleetcoreplatform.Managers.Database.Providers.DbDroneUpdateProvider;
+import io.fleetcoreplatform.Managers.Database.TypeHandlers.GeometryTypeHandler;
+import io.fleetcoreplatform.Models.DroneHomePositionModel;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
@@ -9,30 +11,67 @@ import org.apache.ibatis.annotations.*;
 
 @Mapper
 public interface DroneMapper {
-    @Select("SELECT * FROM drones WHERE uuid = #{uuid, jdbcType=OTHER}")
+    @Select(
+            "SELECT uuid, name, group_uuid, address, manager_version, first_discovered,"
+                    + " home_position FROM drones WHERE uuid = #{uuid,"
+                    + " jdbcType=OTHER}")
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
     DbDrone findByUuid(@Param("uuid") UUID uuid);
 
-    @Select("SELECT * FROM drones LIMIT ${limit}")
+    @Select(
+            "SELECT uuid, name, group_uuid, address, manager_version, first_discovered, "
+                    + "home_position FROM drones LIMIT ${limit}")
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
     List<DbDrone> listDrones(@Param("limit") int limit);
 
-    @Select("SELECT * FROM drones WHERE group_uuid = #{group_uuid, jdbcType=OTHER} LIMIT ${limit}")
+    @Select(
+            "SELECT uuid, name, group_uuid, address, manager_version, first_discovered,"
+                    + " home_position FROM drones WHERE group_uuid ="
+                    + " #{groupUuid, jdbcType=OTHER} LIMIT ${limit}")
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
     List<DbDrone> listDronesByGroupUuid(
-            @Param("group_uuid") UUID group_uuid, @Param("limit") int limit);
+            @Param("groupUuid") UUID groupUuid, @Param("limit") int limit);
 
-    @Select("SELECT * FROM drones WHERE name = #{name}")
+    @Select(
+            "SELECT uuid, name, group_uuid, address, manager_version, first_discovered, "
+                    + "home_position FROM drones WHERE name = #{name}")
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
     DbDrone findByName(@Param("name") String name);
 
     @Insert(
             "INSERT INTO drones (uuid, name, group_uuid, address, manager_version,"
-                    + " first_discovered) VALUES (#{uuid, jdbcType=OTHER}, #{name}, #{groupUuid,"
-                    + " jdbcType=OTHER}, #{address}, #{managerVersion}, #{firstDiscovered})")
+                    + " first_discovered, home_position) VALUES (#{uuid, jdbcType=OTHER}, #{name},"
+                    + " #{groupUuid, jdbcType=OTHER}, #{address}, #{managerVersion},"
+                    + " #{firstDiscovered}, st_pointz(#{homePosition.x}, #{homePosition.y},"
+                    + " #{homePosition.z}))")
     void insertDrone(
             @Param("uuid") UUID uuid,
             @Param("name") String name,
             @Param("groupUuid") UUID groupUuid,
             @Param("address") String address,
             @Param("managerVersion") String managerVersion,
-            @Param("firstDiscovered") Timestamp firstDiscovered);
+            @Param("firstDiscovered") Timestamp firstDiscovered,
+            @Param("homePosition") DroneHomePositionModel homePosition);
 
     @UpdateProvider(type = DbDroneUpdateProvider.class, method = "update")
     void updateDrone(@Param("uuid") UUID uuid, @Param("drone") DbDrone drone);

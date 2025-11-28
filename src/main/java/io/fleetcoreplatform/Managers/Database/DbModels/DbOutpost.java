@@ -1,15 +1,21 @@
 package io.fleetcoreplatform.Managers.Database.DbModels;
 
+import io.fleetcoreplatform.Models.OutpostAreaModel;
+import io.fleetcoreplatform.Models.PolygonPoint2DModel;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import org.postgis.Geometry;
+import org.postgis.Point;
 
 public class DbOutpost {
     private UUID uuid;
     private String name;
     private BigDecimal latitude;
     private BigDecimal longitude;
-    private String area;
+    private OutpostAreaModel area;
     private UUID created_by;
     private Timestamp created_at;
 
@@ -45,12 +51,19 @@ public class DbOutpost {
         this.longitude = longitude;
     }
 
-    public String getArea() {
+    public OutpostAreaModel getArea() {
         return area;
     }
 
-    public void setArea(String area) {
-        this.area = area;
+    public void setArea(Geometry area) {
+        List<PolygonPoint2DModel> points = new ArrayList<>();
+
+        for (int i = 0; i < area.numPoints(); i++) {
+            Point point = area.getPoint(i);
+            points.add(new PolygonPoint2DModel(point.x, point.y));
+        }
+
+        this.area = new OutpostAreaModel(points);
     }
 
     public UUID getCreated_by() {
