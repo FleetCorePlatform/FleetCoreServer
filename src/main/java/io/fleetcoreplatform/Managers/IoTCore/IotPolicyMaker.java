@@ -2,6 +2,7 @@ package io.fleetcoreplatform.Managers.IoTCore;
 
 public class IotPolicyMaker {
     public static String buildPolicyDocument(String accountId, String region) {
+        // TODO: Fix policy template that does not grant sufficient permissions (#20)
         String template =
                 """
             {

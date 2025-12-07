@@ -240,18 +240,22 @@ public class IotManager {
         ListAttachedPoliciesResponse response =
                 iotAsyncClient.listAttachedPolicies(listAttachedPoliciesRequest).join();
 
-        response.policies().forEach(policy -> {
-            DetachPolicyRequest detachRequest = DetachPolicyRequest.builder()
-                    .policyName(policy.policyName())
-                    .target(principalARN)
-                    .build();
-            iotAsyncClient.detachPolicy(detachRequest).join();
+        response.policies()
+                .forEach(
+                        policy -> {
+                            DetachPolicyRequest detachRequest =
+                                    DetachPolicyRequest.builder()
+                                            .policyName(policy.policyName())
+                                            .target(principalARN)
+                                            .build();
+                            iotAsyncClient.detachPolicy(detachRequest).join();
 
-            DeletePolicyRequest deleteRequest = DeletePolicyRequest.builder()
-                    .policyName(policy.policyName())
-                    .build();
-            iotAsyncClient.deletePolicy(deleteRequest).join();
-        });
+                            DeletePolicyRequest deleteRequest =
+                                    DeletePolicyRequest.builder()
+                                            .policyName(policy.policyName())
+                                            .build();
+                            iotAsyncClient.deletePolicy(deleteRequest).join();
+                        });
     }
 
     public void deleteCertificates(String deviceName) {
@@ -262,21 +266,27 @@ public class IotManager {
                 iotAsyncClient.listThingPrincipals(listThingPrincipalsRequest);
 
         ListThingPrincipalsResponse response = future.join();
-        response.principals().stream().toList().forEach(principalARN -> {
-            String certificateId = principalARN.substring(principalARN.lastIndexOf('/') + 1);
+        response.principals().stream()
+                .toList()
+                .forEach(
+                        principalARN -> {
+                            String certificateId =
+                                    principalARN.substring(principalARN.lastIndexOf('/') + 1);
 
-            UpdateCertificateRequest updateRequest = UpdateCertificateRequest.builder()
-                .certificateId(certificateId)
-                .newStatus(CertificateStatus.INACTIVE)
-                .build();
-            iotAsyncClient.updateCertificate(updateRequest).join();
+                            UpdateCertificateRequest updateRequest =
+                                    UpdateCertificateRequest.builder()
+                                            .certificateId(certificateId)
+                                            .newStatus(CertificateStatus.INACTIVE)
+                                            .build();
+                            iotAsyncClient.updateCertificate(updateRequest).join();
 
-            DeleteCertificateRequest deleteRequest = DeleteCertificateRequest.builder()
-                .certificateId(certificateId)
-                .forceDelete(true)
-                .build();
-            iotAsyncClient.deleteCertificate(deleteRequest).join();
-        });
+                            DeleteCertificateRequest deleteRequest =
+                                    DeleteCertificateRequest.builder()
+                                            .certificateId(certificateId)
+                                            .forceDelete(true)
+                                            .build();
+                            iotAsyncClient.deleteCertificate(deleteRequest).join();
+                        });
     }
 
     public void detachCertificates(String deviceName) {
@@ -289,17 +299,18 @@ public class IotManager {
         ListThingPrincipalsResponse response = future.join();
         List<String> principalARNs = new ArrayList<>(response.principals());
 
-        principalARNs.forEach(arn -> {
-            removePolicies(arn);
+        principalARNs.forEach(
+                arn -> {
+                    removePolicies(arn);
 
-            DetachThingPrincipalRequest detachThingPrincipalRequest =
-                    DetachThingPrincipalRequest.builder()
-                            .principal(arn)
-                            .thingName(deviceName)
-                            .build();
+                    DetachThingPrincipalRequest detachThingPrincipalRequest =
+                            DetachThingPrincipalRequest.builder()
+                                    .principal(arn)
+                                    .thingName(deviceName)
+                                    .build();
 
-            iotAsyncClient.detachThingPrincipal(detachThingPrincipalRequest).join();
-        });
+                    iotAsyncClient.detachThingPrincipal(detachThingPrincipalRequest).join();
+                });
     }
 
     public void createThingGroup(String groupName, String outpostName) {
