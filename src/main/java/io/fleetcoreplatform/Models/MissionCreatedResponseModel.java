@@ -1,3 +1,5 @@
 package io.fleetcoreplatform.Models;
 
-public record MissionCreatedResponseModel() {}
+import java.util.UUID;
+
+public record MissionCreatedResponseModel(UUID missionUUID) {}

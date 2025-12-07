@@ -1,10 +1,8 @@
 package io.fleetcoreplatform.Services;
 
-import io.fleetcoreplatform.Algorithms.PolygonCoverageAlgorithm;
 import io.fleetcoreplatform.Configs.ApplicationConfig;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Cognito.CognitoManager;
-import io.fleetcoreplatform.Managers.Database.DatabaseManager;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbDrone;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbGroup;
@@ -13,6 +11,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.*;
 import io.fleetcoreplatform.Managers.IoTCore.IotDataPlaneManager;
 import io.fleetcoreplatform.Managers.IoTCore.IotManager;
 import io.fleetcoreplatform.Managers.S3.StorageManager;
+import io.fleetcoreplatform.MissionPlanner;
 import io.fleetcoreplatform.Models.*;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,8 +22,7 @@ import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import org.jboss.logging.Logger;
 import org.postgis.Geometry;
 import software.amazon.awssdk.services.iot.model.JobExecution;
@@ -34,7 +32,6 @@ import software.amazon.awssdk.services.iot.model.JobExecution;
 public class CoreService {
     @Inject IotManager iotManager;
     @Inject IotDataPlaneManager iotDataPlaneManager;
-    @Inject DatabaseManager dbManager;
     @Inject StorageManager storageManager;
     @Inject CognitoManager cognitoManager;
     @Inject ApplicationConfig config;
@@ -55,7 +52,12 @@ public class CoreService {
      * @param agentVersion Version of the OnboardAgent client
      */
     public IoTCertContainer registerNewDrone(
-            String group, String droneName, String address, String px4Version, String agentVersion)
+            String group,
+            String droneName,
+            String address,
+            String px4Version,
+            String agentVersion,
+            DroneHomePositionModel homePosition)
             throws NotFoundException {
         DbGroup dbGroup = groupMapper.findByName(group);
 
@@ -78,7 +80,8 @@ public class CoreService {
 
         UUID groupUUID = dbGroup.getUuid();
         Timestamp addedDate = new Timestamp(System.currentTimeMillis());
-        droneMapper.insertDrone(uuid, droneName, groupUUID, address, agentVersion, addedDate);
+        droneMapper.insertDrone(
+                uuid, droneName, groupUUID, address, agentVersion, addedDate, homePosition);
 
         return certContainer;
     }
@@ -260,13 +263,22 @@ public class CoreService {
      * Coordinates multiple managers to create an IoT Core mission for a group of drones
      *
      * @param outpost The name of the outpost the groups is in
-     * @param group Name of the group of drones
+     * @param groupUUID Name of the group of drones
      * @param coordinatorUUID The UUID of the coordinator performing this operation
      * @throws IOException If there was an error generating the mission bundle
      * @throws NotFoundException If the outpost, or group doesn't exist
      */
-    public UUID createNewMission(String outpost, String group, UUID coordinatorUUID)
+    public UUID createNewMission(
+            String outpost, UUID groupUUID, UUID coordinatorUUID, Integer altitude)
             throws IOException, NotFoundException {
+
+        DbGroup dbgroup = groupMapper.findByUuid(groupUUID);
+        if (dbgroup == null) {
+            throw new NotFoundException("Group not found with UUID " + groupUUID.toString());
+        }
+
+        String group = dbgroup.getName();
+
         Timestamp startedAt = new Timestamp(System.currentTimeMillis());
 
         String s3Timestamp =
@@ -276,12 +288,32 @@ public class CoreService {
 
         String missionPath = "missions/" + outpost + "/" + group + "/mission-" + s3Timestamp;
 
-        Geometry area = dbManager.getOutpostGeometry(outpost);
-        if (area == null) {
+        DbOutpost dbOutpost = outpostMapper.findByName(outpost);
+        if (dbOutpost == null) {
             throw new NotFoundException("Outpost cannot be found with name " + outpost);
         }
 
-        File missionBundle = PolygonCoverageAlgorithm.calculateSinge(area);
+        Geometry area = dbOutpost.getArea().toGeometry();
+
+        List<DbDrone> drones = droneMapper.listDronesByGroupUuid(groupUUID, 100);
+        ArrayList<DroneIdentity> droneIdentities = getDroneIdentities(groupUUID, drones);
+
+        int missionAltitude =
+                Objects.requireNonNullElseGet(
+                        altitude,
+                        () ->
+                                Math.toIntExact(
+                                        Math.round(
+                                                        drones.stream()
+                                                                .findFirst()
+                                                                .get()
+                                                                .getHome_position()
+                                                                .z())
+                                                + 25));
+
+        File missionBundle =
+                MissionPlanner.buildMission(
+                        area, droneIdentities.toArray(new DroneIdentity[0]), missionAltitude);
         String key = storageManager.uploadMissionBundle(missionPath, missionBundle);
 
         String presignedUrl = storageManager.getPresignedObjectUrl(key);
@@ -300,13 +332,6 @@ public class CoreService {
                         Map.entry("downloadUrl", presignedUrl),
                         Map.entry("filePath", "/tmp/missions/")));
 
-        DbGroup dbgroup = groupMapper.findByName(group);
-        if (dbgroup == null) {
-            throw new NotFoundException("Group not found with name " + group);
-        }
-
-        UUID groupUUID = dbgroup.getUuid();
-
         String bundleUrl = storageManager.getInternalObjectUrl(key);
 
         UUID missionUuid = UUID.randomUUID();
@@ -314,6 +339,25 @@ public class CoreService {
                 missionUuid, groupUUID, iotMissionName, bundleUrl, startedAt, coordinatorUUID);
 
         return missionUuid;
+    }
+
+    private static ArrayList<DroneIdentity> getDroneIdentities(
+            UUID groupUUID, List<DbDrone> drones) {
+        ArrayList<DroneIdentity> droneIdentities = new ArrayList<>();
+
+        if (drones.isEmpty()) {
+            throw new NotFoundException(
+                    "No drones found in group with UUID" + groupUUID.toString());
+        }
+
+        for (DbDrone drone : drones) {
+            DroneHomePositionModel home = drone.getHome_position();
+
+            droneIdentities.add(
+                    new DroneIdentity(
+                            drone.getName(), new DroneIdentity.Home(home.x(), home.y(), home.z())));
+        }
+        return droneIdentities;
     }
 
     public DroneExecutionStatusResponseModel getMissionStatus(UUID droneUuid)

@@ -3,6 +3,7 @@ package io.fleetcoreplatform.Endpoints;
 import io.fleetcoreplatform.Managers.SQS.QueueManager;
 import io.fleetcoreplatform.Models.CreateMissionRequestModel;
 import io.fleetcoreplatform.Models.DroneExecutionStatusResponseModel;
+import io.fleetcoreplatform.Models.MissionCreatedResponseModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
@@ -29,15 +30,20 @@ public class MissionsEndpoint {
     public Response startOutpostSurvey(CreateMissionRequestModel body) {
         if (body == null
                 || body.outpost() == null
-                || body.group() == null
+                || body.groupUUID() == null
                 || body.coordinatorUUID() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
         try {
-            coreService.createNewMission(body.outpost(), body.group(), body.coordinatorUUID());
+            UUID missionUUID =
+                    coreService.createNewMission(
+                            body.outpost(),
+                            body.groupUUID(),
+                            body.coordinatorUUID(),
+                            body.altitude());
 
-            return Response.ok().build();
+            return Response.ok(new MissionCreatedResponseModel(missionUUID)).build();
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (IotException ioe) {
@@ -48,6 +54,15 @@ public class MissionsEndpoint {
 
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @POST
+    @Path("/cancel/{mission_uuid}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response cancelMission(@PathParam("mission_uuid") UUID missionUUID) {
+        // TODO: Implement mission cancel logic (#17)
+        return Response.status(Response.Status.NOT_IMPLEMENTED).build();
     }
 
     @GET
