@@ -8,6 +8,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.GroupRequestModel;
 import io.fleetcoreplatform.Models.UpdateGroupOutpostModel;
 import io.fleetcoreplatform.Services.CoreService;
+import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -27,24 +28,6 @@ public class GroupsEndpoint {
     @Inject OutpostMapper outpostMapper;
     @Inject CoreService coreService;
     Logger logger = Logger.getLogger(GroupsEndpoint.class.getName());
-
-    @GET
-    @Path("/list/{outpost_uuid}")
-    @Produces(MediaType.APPLICATION_JSON)
-    @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
-    public Response listGroups(@PathParam("outpost_uuid") UUID outpost_uuid) {
-        try {
-            List<DbGroup> groups = groupMapper.listGroupsByOutpostUuid(outpost_uuid);
-            if (groups == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-
-            return Response.ok(groups).build();
-        } catch (Exception e) {
-            logger.severe(e.getMessage());
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        }
-    }
 
     @POST
     @Path("/create/")
