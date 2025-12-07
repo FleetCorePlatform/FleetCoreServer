@@ -17,7 +17,7 @@ import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/coordinators/")
-// @RolesAllowed("${allowed.role-name}")
+//@RolesAllowed("${allowed.superadmin.role-name}")
 public class CoordinatorsEndpoint {
     @Inject CoordinatorMapper coordinatorMapper;
     @Inject CoreService coreService;
