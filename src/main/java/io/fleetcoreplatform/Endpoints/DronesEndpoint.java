@@ -99,7 +99,11 @@ public class DronesEndpoint {
                 || body.droneName() == null
                 || body.address() == null
                 || body.px4Version() == null
-                || body.agentVersion() == null) {
+                || body.agentVersion() == null
+                || body.homePosition() == null
+                || body.homePosition().x() == null
+                || body.homePosition().y() == null
+                || body.homePosition().z() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
@@ -110,7 +114,8 @@ public class DronesEndpoint {
                             body.droneName(),
                             body.address(),
                             body.px4Version(),
-                            body.agentVersion());
+                            body.agentVersion(),
+                            body.homePosition());
 
             return Response.ok(certs).build();
         } catch (NotFoundException nfe) {
