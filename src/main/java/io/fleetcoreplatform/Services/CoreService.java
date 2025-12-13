@@ -3,10 +3,7 @@ package io.fleetcoreplatform.Services;
 import io.fleetcoreplatform.Configs.ApplicationConfig;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Cognito.CognitoManager;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbDrone;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbGroup;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
+import io.fleetcoreplatform.Managers.Database.DbModels.*;
 import io.fleetcoreplatform.Managers.Database.Mappers.*;
 import io.fleetcoreplatform.Managers.IoTCore.IotDataPlaneManager;
 import io.fleetcoreplatform.Managers.IoTCore.IotManager;
@@ -25,7 +22,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.jboss.logging.Logger;
 import org.postgis.Geometry;
-import software.amazon.awssdk.services.iot.model.JobExecution;
+import software.amazon.awssdk.services.iot.model.Job;
+import software.amazon.awssdk.services.iot.model.JobExecutionSummary;
 
 @Startup
 @ApplicationScoped
@@ -360,8 +358,13 @@ public class CoreService {
         return droneIdentities;
     }
 
-    public DroneExecutionStatusResponseModel getMissionStatus(UUID droneUuid)
+    public DroneExecutionStatusResponseModel getThingMissionStatus(UUID droneUuid, UUID missionUuid, String sub)
             throws NotFoundException {
+        DbMission mission = missionMapper.findByIdAndCoordinator(missionUuid, sub);
+        if (mission == null) {
+            throw new NotFoundException("Mission not found with UUID " + missionUuid.toString());
+        }
+
         DbDrone drone = droneMapper.findByUuid(droneUuid);
         if (drone == null) {
             throw new NotFoundException("Drone not found with UUID " + droneUuid.toString());
@@ -369,14 +372,23 @@ public class CoreService {
 
         String thingName = drone.getName();
 
-        String lastJopId = iotManager.getLastJobId(thingName);
-        if (lastJopId == null) {
+        JobExecutionSummary executionSummary = iotManager.getThingJob(thingName, mission.getName());
+        if (executionSummary == null) {
             return null;
         }
 
-        JobExecution jobStatus = iotManager.getJobExecutionStatus(lastJopId, thingName);
+        return new DroneExecutionStatusResponseModel(droneUuid, executionSummary.status(), Timestamp.from(executionSummary.lastUpdatedAt()));
+    }
 
-        return new DroneExecutionStatusResponseModel(
-                droneUuid, jobStatus.status(), jobStatus.startedAt());
+    public MissionExecutionStatusModel getMissionStatus(UUID missionUuid, String sub)
+            throws NotFoundException {
+        DbMission mission = missionMapper.findByIdAndCoordinator(missionUuid, sub);
+        if (mission == null) {
+            throw new NotFoundException("Mission not found with UUID " + missionUuid.toString());
+        }
+
+        Job job = iotManager.getJob(mission.getName());
+
+        return new MissionExecutionStatusModel(job.status(), mission.getStart_time(), Timestamp.from(job.completedAt()));
     }
 }

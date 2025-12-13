@@ -72,19 +72,9 @@ public class IotManager {
                 iotAsyncClient.attachPolicy(attachPolicyRequest).join();
     }
 
-    public JobExecution getJobExecutionStatus(String jobId, String thingName) {
-        DescribeJobExecutionRequest describeJobExecutionRequest =
-                DescribeJobExecutionRequest.builder().jobId(jobId).thingName(thingName).build();
-
-        CompletableFuture<DescribeJobExecutionResponse> response =
-                iotAsyncClient.describeJobExecution(describeJobExecutionRequest);
-
-        return response.join().execution();
-    }
-
-    public String getLastJobId(String thingName) {
+    public JobExecutionSummary getThingJob(String thingName, String jobId) {
         ListJobExecutionsForThingRequest listJobExecutionsForThingRequest =
-                ListJobExecutionsForThingRequest.builder().thingName(thingName).build();
+                ListJobExecutionsForThingRequest.builder().jobId(jobId).thingName(thingName).build();
 
         CompletableFuture<ListJobExecutionsForThingResponse> future =
                 iotAsyncClient.listJobExecutionsForThing(listJobExecutionsForThingRequest);
@@ -92,7 +82,22 @@ public class IotManager {
         try {
             ListJobExecutionsForThingResponse response = future.join();
 
-            return response.executionSummaries().getFirst().jobId();
+            return response.executionSummaries().getFirst().jobExecutionSummary();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public Job getJob(String jobId) {
+        DescribeJobRequest request =
+            DescribeJobRequest.builder().jobId(jobId).build();
+
+        CompletableFuture<DescribeJobResponse> future =
+                iotAsyncClient.describeJob(request);
+        try {
+            DescribeJobResponse response = future.join();
+
+            return response.job();
         } catch (Exception e) {
             return null;
         }

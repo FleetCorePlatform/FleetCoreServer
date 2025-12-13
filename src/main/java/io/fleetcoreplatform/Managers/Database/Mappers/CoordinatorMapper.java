@@ -24,6 +24,9 @@ public interface CoordinatorMapper {
     @Select("SELECT * FROM coordinators WHERE uuid = #{uuid, jdbcType=OTHER}")
     DbCoordinator findByUuid(@Param("uuid") UUID uuid);
 
+    @Select("SELECT * FROM coordinators WHERE cognito_sub = #{uuid}")
+    DbCoordinator findByCognitoSub(@Param("cognito_sub") String sub);
+
     @UpdateProvider(type = DbCoordinatorUpdateProvider.class, method = "update")
     void update(@Param("uuid") UUID uuid, @Param("coordinator") UpdateCoordinatorModel coordinator);
 

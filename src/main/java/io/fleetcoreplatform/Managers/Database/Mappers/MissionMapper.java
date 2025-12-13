@@ -2,6 +2,7 @@ package io.fleetcoreplatform.Managers.Database.Mappers;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.*;
 
@@ -36,4 +37,12 @@ public interface MissionMapper {
 
     @Delete("DELETE FROM missions WHERE uuid = #{uuid, jdbcType=OTHER}")
     void delete(@Param("uuid") UUID uuid);
+
+    @Select("SELECT m.* FROM missions m INNER JOIN public.coordinators c ON m.created_by = c.uuid " +
+            "WHERE m.uuid = #{uuid, jdbcType=OTHER} AND c.cognito_sub = #{sub}")
+    DbMission findByIdAndCoordinator(@Param("uuid") UUID uuid, @Param("sub") String sub);
+
+    @Select("SELECT m.* FROM missions m INNER JOIN public.coordinators c ON m.created_by = c.uuid " +
+            "WHERE c.cognito_sub = #{sub}")
+    List<DbMission> listByCoordinator(@Param("sub") String sub);
 }
