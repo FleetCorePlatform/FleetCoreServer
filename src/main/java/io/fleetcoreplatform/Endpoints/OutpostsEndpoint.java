@@ -1,15 +1,16 @@
 package io.fleetcoreplatform.Endpoints;
 
-import io.fleetcoreplatform.Managers.Database.DbModels.DbGroup;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
-import io.fleetcoreplatform.Managers.Database.Mappers.GroupMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.CreateOutpostModel;
+import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
+import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -18,16 +19,17 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jboss.logging.Logger;
 
+// TODO: Implement row-level authentication on outposts endpoint (#28)
+
 @Path("/api/v1/outposts")
 // @RolesAllowed("${allowed.role-name}")
 public class OutpostsEndpoint {
     @Inject OutpostMapper outpostMapper;
-    @Inject GroupMapper groupMapper;
+    @Inject SecurityIdentity identity;
     @Inject Logger logger;
 
     // TODO: Implement OutpostsEndpoint (#24)
     @POST
-    @Path("/create/")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
@@ -61,7 +63,8 @@ public class OutpostsEndpoint {
                     areaWkt,
                     body.coordinatorUUID(),
                     timestamp);
-            return Response.noContent().build();
+
+            return Response.created(URI.create(String.format("/api/v1/outposts/%s", uuid))).build();
         } catch (Exception e) {
             logger.error("Error while inserting outpost", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
@@ -69,23 +72,43 @@ public class OutpostsEndpoint {
     }
 
     @GET
-    @Path("/list/{outpost_uuid}")
+    @Path("/{outpost-uuid}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listOutpostGroups(@PathParam("outpost_uuid") UUID outpostUUID) {
+    public Response getOutpost(@PathParam("outpost-uuid") UUID outpostUUID) {
         try {
-            DbOutpost outpost = outpostMapper.findByUuid(outpostUUID);
+            String cognitoSub = identity.getPrincipal().getName();
+
+            DbOutpost outpost = outpostMapper.findByUuidAndCoordinator(outpostUUID, cognitoSub);
             if (outpost == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
-            List<DbGroup> groupList = groupMapper.listGroupsByOutpostUuid(outpostUUID);
-            if (groupList.isEmpty()) {
-                return Response.noContent().build();
-            } else {
-                return Response.ok(groupList).build();
-            }
+            return Response.ok(outpost).build();
+
         } catch (Exception e) {
             logger.error("Error while listing outpost groups", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response listCoordinatorOutposts() {
+        try {
+            String cognitoSub = identity.getPrincipal().getName();
+
+            List<DbOutpost> outposts = outpostMapper.listByCoordinator(cognitoSub);
+            if (outposts == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            if (outposts.isEmpty()) {
+                return Response.noContent().build();
+            } else {
+                return Response.ok(outposts).build();
+            }
+        } catch (Exception e) {
+            logger.error("Error while listing outposts", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

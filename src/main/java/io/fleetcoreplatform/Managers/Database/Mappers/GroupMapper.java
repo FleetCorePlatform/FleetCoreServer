@@ -23,6 +23,17 @@ public interface GroupMapper {
     @Select("SELECT * FROM groups WHERE outpost_uuid = #{outpost_uuid, jdbcType=OTHER}")
     List<DbGroup> listGroupsByOutpostUuid(@Param("outpost_uuid") UUID uuid);
 
+    @Select("""
+        SELECT g.* FROM groups g
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE g.outpost_uuid = #{outpostUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    List<DbGroup> listGroupsByOutpostUuidAndCoordinator(
+            @Param("outpostUuid") UUID outpostUuid,
+            @Param("cognitoSub") String cognitoSub);
+
     @Select("SELECT * FROM groups WHERE name = #{name}")
     DbGroup findByName(@Param("name") String name);
 

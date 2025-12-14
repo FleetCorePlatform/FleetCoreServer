@@ -6,6 +6,7 @@ import io.fleetcoreplatform.Models.DroneRequestModel;
 import io.fleetcoreplatform.Models.IoTCertContainer;
 import io.fleetcoreplatform.Models.SetDroneGroupRequestModel;
 import io.fleetcoreplatform.Services.CoreService;
+import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -22,12 +23,15 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.jboss.resteasy.reactive.NoCache;
 
+// TODO: Implement row-level authentication on drones endpoint (#29)
+
 @NoCache
 @Path("/api/v1/drones/")
 // @RolesAllowed("${allowed.role-name}")
 public class DronesEndpoint {
     @Inject CoreService coreService;
     @Inject DroneMapper droneMapper;
+    @Inject SecurityIdentity identity;
     Logger logger = Logger.getLogger(DronesEndpoint.class.getName());
 
     @GET
@@ -53,12 +57,14 @@ public class DronesEndpoint {
             @DefaultValue("10") @QueryParam("limit") int limit,
             @PathParam("group_uuid") UUID group_uuid) {
 
+        String cognitoSub = identity.getAttribute("sub").toString();
+
         if (limit <= 0 || limit > 1000) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
         try {
-            List<DbDrone> drones = droneMapper.listDronesByGroupUuid(group_uuid, limit);
+            List<DbDrone> drones = droneMapper.listDronesByGroupAndCoordinator(group_uuid, cognitoSub, limit);
             if (drones == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }

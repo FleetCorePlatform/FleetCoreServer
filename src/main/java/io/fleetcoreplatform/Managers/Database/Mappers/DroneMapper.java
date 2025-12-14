@@ -48,6 +48,28 @@ public interface DroneMapper {
             @Param("groupUuid") UUID groupUuid, @Param("limit") int limit);
 
     @Select(
+            """
+        SELECT d.uuid, d.name, d.group_uuid, d.address, d.manager_version, d.first_discovered, d.home_position
+        FROM drones d
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE d.group_uuid = #{groupUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+        LIMIT ${limit}
+    """)
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
+    List<DbDrone> listDronesByGroupAndCoordinator(
+            @Param("groupUuid") UUID groupUuid,
+            @Param("cognitoSub") String cognitoSub,
+            @Param("limit") int limit);
+
+    @Select(
             "SELECT uuid, name, group_uuid, address, manager_version, first_discovered, "
                     + "home_position FROM drones WHERE name = #{name}")
     @Results({
