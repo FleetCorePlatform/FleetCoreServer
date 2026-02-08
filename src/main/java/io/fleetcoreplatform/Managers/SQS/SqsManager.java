@@ -18,7 +18,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
 
 @ApplicationScoped
-public class QueueManager {
+public class SqsManager {
     private SqsClient sqsClient;
     private ObjectMapper mapper;
 
@@ -34,6 +34,10 @@ public class QueueManager {
     @PreDestroy
     public void destroy() {
         sqsClient.close();
+    }
+
+    public SqsClient getClient() {
+        return sqsClient;
     }
 
     public List<DroneTelemetryModel> ingestQueue(String queueName) {
