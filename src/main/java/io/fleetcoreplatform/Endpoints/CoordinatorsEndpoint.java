@@ -19,25 +19,34 @@ import org.jboss.resteasy.reactive.NoCache;
 @Path("/api/v1/coordinators/")
 //@RolesAllowed("${allowed.superadmin.role-name}")
 public class CoordinatorsEndpoint {
-    @Inject CoordinatorMapper coordinatorMapper;
-    @Inject CoreService coreService;
+
+    @Inject
+    CoordinatorMapper coordinatorMapper;
+
+    @Inject
+    CoreService coreService;
 
     @GET
     @Path("/{coordinator_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
-    public Response getCoordinator(@PathParam("coordinator_uuid") UUID coordinator_uuid) {
+    public Response getCoordinator(
+        @PathParam("coordinator_uuid") UUID coordinator_uuid
+    ) {
         try {
-            DbCoordinator coordinator = coordinatorMapper.findByUuid(coordinator_uuid);
+            DbCoordinator coordinator = coordinatorMapper.findByUuid(
+                coordinator_uuid
+            );
 
             if (coordinator == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
             return Response.ok(coordinator).build();
-
         } catch (Exception e) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return Response.status(
+                Response.Status.INTERNAL_SERVER_ERROR
+            ).build();
         }
     }
 
@@ -46,28 +55,37 @@ public class CoordinatorsEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @RateLimit(value = 2, window = 1, windowUnit = ChronoUnit.HOURS)
-    public Response registerCoordinator(CoordinatorRequestModel coordinatorRequestModel) {
-        if (coordinatorRequestModel == null
-                || coordinatorRequestModel.email() == null
-                || coordinatorRequestModel.firstName() == null
-                || coordinatorRequestModel.lastName() == null) {
+    public Response registerCoordinator(
+        CoordinatorRequestModel coordinatorRequestModel
+    ) {
+        if (
+            coordinatorRequestModel == null ||
+            coordinatorRequestModel.email() == null ||
+            coordinatorRequestModel.firstName() == null ||
+            coordinatorRequestModel.lastName() == null
+        ) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
         try {
             CognitoCreatedResponseModel response =
-                    coreService.registerNewCoordinator(
-                            coordinatorRequestModel.email(),
-                            coordinatorRequestModel.firstName(),
-                            coordinatorRequestModel.lastName());
+                coreService.registerNewCoordinator(
+                    coordinatorRequestModel.email(),
+                    coordinatorRequestModel.firstName(),
+                    coordinatorRequestModel.lastName()
+                );
 
             if (response == null) {
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+                return Response.status(
+                    Response.Status.INTERNAL_SERVER_ERROR
+                ).build();
             }
 
             return Response.ok(response.temp_password()).build();
         } catch (Exception ex) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return Response.status(
+                Response.Status.INTERNAL_SERVER_ERROR
+            ).build();
         }
     }
 
@@ -77,8 +95,13 @@ public class CoordinatorsEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
     public Response updateCoordinator(
-            @PathParam("coordinator_uuid") UUID coordinator_uuid, UpdateCoordinatorModel body) {
-        if (body == null || (body.lastName() == null && body.firstName() == null)) {
+        @PathParam("coordinator_uuid") UUID coordinator_uuid,
+        UpdateCoordinatorModel body
+    ) {
+        if (
+            body == null ||
+            (body.lastName() == null && body.firstName() == null)
+        ) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
