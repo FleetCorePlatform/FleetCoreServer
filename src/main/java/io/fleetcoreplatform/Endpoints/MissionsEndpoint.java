@@ -4,7 +4,7 @@ import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
-import io.fleetcoreplatform.Managers.SQS.QueueManager;
+import io.fleetcoreplatform.Managers.SQS.SqsManager;
 import io.fleetcoreplatform.Models.CreateMissionRequestModel;
 import io.fleetcoreplatform.Models.DroneExecutionStatusResponseModel;
 import io.fleetcoreplatform.Models.MissionCreatedResponseModel;
@@ -12,6 +12,7 @@ import io.fleetcoreplatform.Models.MissionExecutionStatusModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -27,7 +28,8 @@ import software.amazon.awssdk.services.iot.model.IotException;
 @RolesAllowed("${allowed.role-name}")
 public class MissionsEndpoint {
     @Inject CoreService coreService;
-    @Inject QueueManager sqsManager;
+    @Inject
+    SqsManager sqsManager;
     @Inject MissionMapper missionMapper;
     @Inject SecurityIdentity identity;
 
@@ -82,16 +84,22 @@ public class MissionsEndpoint {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllMissions() {
+    public Response getAllMissions(@Nullable @QueryParam("outpost_uuid") UUID outpostUuid) {
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<DbMission> outposts = missionMapper.listByCoordinator(cognitoSub);
-            if (outposts == null) {
+            List<DbMission> missions;
+            if (outpostUuid != null) {
+                missions = missionMapper.listMissionsByCoordinatorAndOutpost(cognitoSub, outpostUuid);
+            } else {
+                missions = missionMapper.listByCoordinator(cognitoSub);
+            }
+
+            if (missions == null) {
                 return Response.status(Response.Status.NO_CONTENT).build();
             }
 
-            return Response.ok(outposts).build();
+            return Response.ok(missions).build();
 
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();

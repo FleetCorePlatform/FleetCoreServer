@@ -45,4 +45,14 @@ public interface MissionMapper {
     @Select("SELECT m.* FROM missions m INNER JOIN public.coordinators c ON m.created_by = c.uuid " +
             "WHERE c.cognito_sub = #{sub}")
     List<DbMission> listByCoordinator(@Param("sub") String sub);
+
+    @Select("""
+        SELECT m.* FROM missions m
+        INNER JOIN groups g ON m.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE o.uuid = #{outpostUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    List<DbMission> listMissionsByCoordinatorAndOutpost(String cognitoSub, UUID outpostUuid);
 }
