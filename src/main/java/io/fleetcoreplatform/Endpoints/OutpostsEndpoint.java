@@ -3,6 +3,8 @@ package io.fleetcoreplatform.Endpoints;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.CreateOutpostModel;
+import io.fleetcoreplatform.Models.OutpostGroupSummary;
+import io.fleetcoreplatform.Models.OutpostSummary;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
@@ -72,9 +74,47 @@ public class OutpostsEndpoint {
     }
 
     @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response listOutposts() {
+        try {
+            String cognitoSub = identity.getPrincipal().getName();
+            List<DbOutpost> outposts = outpostMapper.listByCoordinator(cognitoSub);
+
+            return Response.ok(outposts).build();
+        } catch (Exception e) {
+            logger.error("Error while listing outposts", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
     @Path("/{outpost-uuid}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getOutpost(@PathParam("outpost-uuid") UUID outpostUUID) {
+    public Response getOutpost(@PathParam("outpost-uuid") String outpostUUID) {
+        try {
+            String cognitoSub = identity.getPrincipal().getName();
+            UUID uuid = UUID.fromString(outpostUUID);
+
+            DbOutpost outpost = outpostMapper.findByUuidAndCoordinator(uuid, cognitoSub);
+
+            if (outpost == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            return Response.ok(outpost).build();
+        } catch (IllegalArgumentException e) {
+            // Catches invalid UUID strings
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        } catch (Exception e) {
+            logger.error("Error while fetching outpost", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
+    @Path("/{outpost-uuid}/summary")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getOutpostSummary(@PathParam("outpost-uuid") UUID outpostUUID) {
         try {
             String cognitoSub = identity.getPrincipal().getName();
 
@@ -83,32 +123,12 @@ public class OutpostsEndpoint {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
-            return Response.ok(outpost).build();
+            List<OutpostGroupSummary> groupSummaries = outpostMapper.findGroupsByOutpostAndCoordinator(outpostUUID, cognitoSub);
+            OutpostSummary summary = new OutpostSummary(outpost.getName(), outpost.getLatitude(), outpost.getLongitude(), outpost.getCreated_at(), groupSummaries, outpost.getArea());
 
+            return Response.ok(summary).build();
         } catch (Exception e) {
-            logger.error("Error while listing outpost groups", e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response listCoordinatorOutposts() {
-        try {
-            String cognitoSub = identity.getPrincipal().getName();
-
-            List<DbOutpost> outposts = outpostMapper.listByCoordinator(cognitoSub);
-            if (outposts == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-
-            if (outposts.isEmpty()) {
-                return Response.noContent().build();
-            } else {
-                return Response.ok(outposts).build();
-            }
-        } catch (Exception e) {
-            logger.error("Error while listing outposts", e);
+            logger.error("Error fetching outpost summary", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

@@ -6,7 +6,11 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
+
+import io.fleetcoreplatform.Models.OutpostGroupSummary;
+import io.fleetcoreplatform.Models.OutpostSummary;
 import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.type.JdbcType;
 
 @Mapper
 public interface OutpostMapper {
@@ -59,4 +63,27 @@ public interface OutpostMapper {
 
     @Delete("DELETE FROM outposts WHERE uuid = #{uuid, jdbcType=OTHER}")
     void delete(@Param("uuid") UUID uuid);
+
+    @Select("""
+        SELECT
+            g.uuid as group_uuid,
+            g.name as group_name,
+            COUNT(d.uuid) as group_drone_count
+        FROM groups g
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        LEFT JOIN drones d ON g.uuid = d.group_uuid
+        WHERE o.uuid = #{outpostUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+        GROUP BY g.uuid, g.name
+    """)
+    @ConstructorArgs({
+        @Arg(column = "group_uuid", javaType = UUID.class, jdbcType = JdbcType.OTHER),
+        @Arg(column = "group_name", javaType = String.class),
+        @Arg(column = "group_drone_count", javaType = int.class)
+    })
+    List<OutpostGroupSummary> findGroupsByOutpostAndCoordinator(
+        @Param("outpostUuid") UUID outpostUuid,
+        @Param("cognitoSub") String cognitoSub
+    );
 }
