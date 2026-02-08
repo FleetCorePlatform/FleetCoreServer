@@ -8,6 +8,9 @@ public interface ApplicationConfig {
     @WithName("region")
     String region();
 
+    @WithName("sqs")
+    SQSConfig sqs();
+
     @WithName("s3")
     S3Config s3();
 
@@ -39,5 +42,10 @@ public interface ApplicationConfig {
     interface CognitoConfig {
         @WithName("user-pool-id")
         String userPoolId();
+    }
+
+    interface SQSConfig {
+        @WithName("queue-name")
+        String queueName();
     }
 }

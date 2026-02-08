@@ -39,6 +39,10 @@ public class CognitoManager {
         client.close();
     }
 
+    public CognitoIdentityProviderAsyncClient getClient() {
+        return client;
+    }
+
     public CognitoCreatedResponseModel createUser(String email, String firstName, String lastName)
             throws SdkException {
         AttributeType emailAttribute = AttributeType.builder().name("email").value(email).build();

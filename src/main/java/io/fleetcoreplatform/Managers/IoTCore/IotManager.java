@@ -46,6 +46,10 @@ public class IotManager {
         }
     }
 
+    public IotAsyncClient getClient() {
+        return iotAsyncClient;
+    }
+
     public String createPolicy(String thingName) throws CompletionException {
         String policyName = thingName + "-policy";
         String policyDocument =
