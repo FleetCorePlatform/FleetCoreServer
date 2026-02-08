@@ -118,13 +118,13 @@ public class CoreService {
         iotManager.addDeviceToGroup(drone.getName(), newGroupARN);
     }
 
-    public void removeDrone(String droneName) throws NotFoundException {
-        DbDrone dbDrone = droneMapper.findByName(droneName);
+    public void removeDrone(UUID droneUuid) throws NotFoundException {
+        DbDrone dbDrone = droneMapper.findByUuid(droneUuid);
         if (dbDrone == null) {
-            throw new NotFoundException("Drone not found with name " + droneName);
+            throw new NotFoundException("Drone not found with UUID " + droneUuid);
         }
 
-        UUID droneUUID = dbDrone.getUuid();
+        String droneName = dbDrone.getName();
 
         iotManager.detachCertificates(droneName);
         iotManager.deleteCertificates(droneName);
@@ -138,7 +138,7 @@ public class CoreService {
         }
 
         iotManager.removeThing(droneName);
-        droneMapper.deleteDrone(droneUUID);
+        droneMapper.deleteDrone(droneUuid);
     }
 
     public void removeDroneFromGroup(UUID droneUUID) throws NotFoundException {

@@ -7,6 +7,8 @@ import io.fleetcoreplatform.Models.DroneHomePositionModel;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
+
+import io.fleetcoreplatform.Models.DroneSummaryModel;
 import org.apache.ibatis.annotations.*;
 
 @Mapper
@@ -22,6 +24,22 @@ public interface DroneMapper {
                 typeHandler = GeometryTypeHandler.class)
     })
     DbDrone findByUuid(@Param("uuid") UUID uuid);
+
+    @Select("""
+        SELECT d.uuid, d.name, d.group_uuid, d.address, d.manager_version, d.first_discovered, d.home_position FROM drones d
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE d.uuid = #{uuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class)
+    })
+    DbDrone findByUuidAndCoordinator(@Param("uuid") UUID uuid, @Param("cognitoSub") String cognitoSub);
 
     @Select(
             "SELECT uuid, name, group_uuid, address, manager_version, first_discovered, "

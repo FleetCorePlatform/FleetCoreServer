@@ -8,6 +8,8 @@ import io.fleetcoreplatform.Models.SetDroneGroupRequestModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.Nullable;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -27,7 +29,7 @@ import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/drones/")
-// @RolesAllowed("${allowed.role-name}")
+@RolesAllowed("${allowed.role-name}")
 public class DronesEndpoint {
     @Inject CoreService coreService;
     @Inject DroneMapper droneMapper;
@@ -35,7 +37,6 @@ public class DronesEndpoint {
     Logger logger = Logger.getLogger(DronesEndpoint.class.getName());
 
     @GET
-    @Path("/list/{group_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
     @APIResponses(
@@ -55,9 +56,13 @@ public class DronesEndpoint {
             })
     public Response listGroupDrones(
             @DefaultValue("10") @QueryParam("limit") int limit,
-            @PathParam("group_uuid") UUID group_uuid) {
+            @Nullable @QueryParam("group_id") UUID group_uuid) {
 
-        String cognitoSub = identity.getAttribute("sub").toString();
+        if (group_uuid == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
 
         if (limit <= 0 || limit > 1000) {
             return Response.status(Response.Status.BAD_REQUEST).build();
@@ -81,8 +86,10 @@ public class DronesEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 25, window = 1, windowUnit = ChronoUnit.SECONDS)
     public Response getDrone(@PathParam("drone_uuid") UUID drone_uuid) {
+        String cognitoSub = identity.getPrincipal().getName();
+
         try {
-            DbDrone drone = droneMapper.findByUuid(drone_uuid);
+            DbDrone drone = droneMapper.findByUuidAndCoordinator(drone_uuid, cognitoSub);
             if (drone == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
@@ -95,7 +102,6 @@ public class DronesEndpoint {
     }
 
     @POST
-    @Path("/register/")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
@@ -134,24 +140,26 @@ public class DronesEndpoint {
     }
 
     @PATCH
-    @Path("/update/{drone_uuid}")
+    @Path("/{drone_uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
-    public Response updateDrone(@PathParam("drone_uuid") UUID drone_uuid, DroneRequestModel body) {
+    public Response updateDrone(@PathParam("drone_uuid") UUID droneUuid, DroneRequestModel body) {
         if (body == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
-        DbDrone droneCheck = droneMapper.findByUuid(drone_uuid);
+        String cognitoSub = identity.getPrincipal().getName();
+
+        DbDrone droneCheck = droneMapper.findByUuidAndCoordinator(droneUuid, cognitoSub);
         if (droneCheck == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
 
         try {
-            coreService.updateDrone(drone_uuid, body);
+            coreService.updateDrone(droneUuid, body);
 
-            return Response.ok().build();
+            return Response.noContent().build();
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND.getStatusCode(), nfe.getMessage())
                     .build();
@@ -162,29 +170,7 @@ public class DronesEndpoint {
     }
 
     @DELETE
-    @Path("/delete/{drone_name}")
-    @Produces(MediaType.APPLICATION_JSON)
-    @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
-    public Response deleteDrone(@PathParam("drone_name") String droneName) {
-        if (droneName == null || droneName.isEmpty()) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
-        }
-
-        try {
-            coreService.removeDrone(droneName);
-
-            return Response.status(Response.Status.NO_CONTENT).build();
-        } catch (NotFoundException nfe) {
-            return Response.status(Response.Status.NOT_FOUND.getStatusCode(), nfe.getMessage())
-                    .build();
-        } catch (Exception e) {
-            logger.severe(e.getMessage());
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @PATCH
-    @Path("/{drone_uuid}/ungroup/")
+    @Path("/{drone_uuid}/group")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
@@ -202,8 +188,8 @@ public class DronesEndpoint {
         }
     }
 
-    @PATCH
-    @Path("/{drone_uuid}/group/")
+    @PUT
+    @Path("/{drone_uuid}/group")
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
@@ -215,6 +201,31 @@ public class DronesEndpoint {
 
         try {
             coreService.addDroneToGroup(drone_uuid, body.group_uuid());
+
+            return Response.noContent().build();
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND.getStatusCode(), nfe.getMessage())
+                    .build();
+        } catch (Exception e) {
+            logger.severe(e.getMessage());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DELETE
+    @Path("/{drone_uuid}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
+    public Response deleteDrone(@PathParam("drone_uuid") UUID droneUuid) {
+        String cognitoSub = identity.getPrincipal().getName();
+
+        DbDrone droneCheck = droneMapper.findByUuidAndCoordinator(droneUuid, cognitoSub);
+        if (droneCheck == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+
+        try {
+            coreService.removeDrone(droneUuid);
 
             return Response.noContent().build();
         } catch (NotFoundException nfe) {
