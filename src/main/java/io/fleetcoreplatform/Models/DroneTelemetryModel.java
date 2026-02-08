@@ -1,7 +1,7 @@
 package io.fleetcoreplatform.Models;
 
 public record DroneTelemetryModel(
-        Float timestamp, Position position, Battery battery, Health health) {
+        String device_name, Float timestamp, Position position, Battery battery, Health health) {
     public record Position(
             Double latitude_deg,
             Double longitude_deg,

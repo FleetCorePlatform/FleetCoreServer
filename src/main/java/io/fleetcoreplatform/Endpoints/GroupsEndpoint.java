@@ -1,33 +1,125 @@
 package io.fleetcoreplatform.Endpoints;
 
+import io.fleetcoreplatform.Configs.ApplicationConfig;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbGroup;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
 import io.fleetcoreplatform.Managers.Database.Mappers.GroupMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
+import io.fleetcoreplatform.Managers.SQS.SqsManager;
+import io.fleetcoreplatform.Models.DroneSummaryModel;
+import io.fleetcoreplatform.Models.DroneTelemetryModel;
 import io.fleetcoreplatform.Models.GroupRequestModel;
 import io.fleetcoreplatform.Models.UpdateGroupOutpostModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
-@Path("/api/v1/groups/")
+@Path("/api/v1/groups")
 // @RolesAllowed("${allowed.role-name}")
 public class GroupsEndpoint {
     @Inject GroupMapper groupMapper;
     @Inject OutpostMapper outpostMapper;
     @Inject CoreService coreService;
-    Logger logger = Logger.getLogger(GroupsEndpoint.class.getName());
+    @Inject SecurityIdentity identity;
+    @Inject
+    SqsManager sqsManager;
+
+    @Inject Logger logger;
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @RateLimit(value = 10, window = 1, windowUnit = ChronoUnit.MINUTES)
+    public Response getGroups(
+        @Nullable @QueryParam("outpost_uuid") UUID outpostUuid,
+        @Nullable @QueryParam("group_uuid") UUID groupUuid,
+        @DefaultValue("10") @QueryParam("limit") Integer limit,
+        @Context ApplicationConfig config
+    ) {
+        try {
+            String cognitoSub = identity.getPrincipal().getName();
+
+            if (outpostUuid != null && groupUuid == null) {
+                List<DbGroup> groups = groupMapper.listGroupsByOutpostUuidAndCoordinator(outpostUuid, cognitoSub);
+                if (groups == null) {
+                    return Response.status(Response.Status.NOT_FOUND).build();
+                }
+                return Response.ok(groups).build();
+            }
+
+            if (groupUuid != null && outpostUuid == null) {
+                List<DroneSummaryModel> drones = groupMapper.listDronesByGroupAndCoordinator(groupUuid, cognitoSub, limit);
+                if (drones == null) {
+                    return Response.status(Response.Status.NOT_FOUND).build();
+                }
+
+                List<DroneTelemetryModel> telemetryModels = sqsManager.ingestQueue(config.sqs().queueName());
+
+                Map<String, DroneTelemetryModel> telemetryByDevice = telemetryModels.stream()
+                    .collect(Collectors.toMap(
+                        DroneTelemetryModel::device_name,
+                        Function.identity(),
+                        (existing, replacement) -> replacement
+                    ));
+
+                List<DroneSummaryModel> dronesWithTelemetry = drones.stream()
+                    .map(drone -> {
+                        DroneTelemetryModel telem = telemetryByDevice.get(drone.getName());
+                        if (telem != null) {
+                            return new DroneSummaryModel(
+                                drone.getUuid(),
+                                drone.getName(),
+                                drone.getGroup_name(),
+                                drone.getAddress(),
+                                drone.getManager_version(),
+                                drone.getFirst_discovered(),
+                                drone.getHome_position(),
+                                drone.getMaintenance(),
+                                telem.battery().remaining_percent(),
+                                true
+                            );
+                        }
+                        return new DroneSummaryModel(
+                            drone.getUuid(),
+                            drone.getName(),
+                            drone.getGroup_name(),
+                            drone.getAddress(),
+                            drone.getManager_version(),
+                            drone.getFirst_discovered(),
+                            drone.getHome_position(),
+                            drone.getMaintenance(),
+                            null,
+                            false
+                        );
+                    })
+                    .toList();
+
+                return Response.ok(dronesWithTelemetry).build();
+            }
+
+            return Response.status(Response.Status.BAD_REQUEST).build();
+
+        } catch (Exception e) {
+            logger.error("Error while listing groups", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     @POST
     @Path("/create/")
@@ -57,7 +149,7 @@ public class GroupsEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
-            logger.severe(e.getMessage());
+            logger.error(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -80,7 +172,7 @@ public class GroupsEndpoint {
         } catch (GroupNotEmptyException gne) {
             return Response.status(Response.Status.NOT_MODIFIED).build();
         } catch (Exception e) {
-            logger.severe(e.getMessage());
+            logger.error(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -103,7 +195,7 @@ public class GroupsEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
-            logger.severe(e.getMessage());
+            logger.error(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
