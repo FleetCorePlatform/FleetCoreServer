@@ -1,6 +1,7 @@
 package io.fleetcoreplatform.Services;
 
 import io.fleetcoreplatform.Configs.ApplicationConfig;
+import io.fleetcoreplatform.Models.DroneIdentity;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Cognito.CognitoManager;
 import io.fleetcoreplatform.Managers.Database.DbModels.*;
