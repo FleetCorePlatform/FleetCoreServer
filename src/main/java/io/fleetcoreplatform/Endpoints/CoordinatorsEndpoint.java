@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
-@Path("/api/v1/coordinators/")
+@Path("/api/v1/coordinators")
 //@RolesAllowed("${allowed.superadmin.role-name}")
 public class CoordinatorsEndpoint {
 
@@ -51,7 +51,6 @@ public class CoordinatorsEndpoint {
     }
 
     @POST
-    @Path("/register/")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @RateLimit(value = 2, window = 1, windowUnit = ChronoUnit.HOURS)
@@ -90,7 +89,7 @@ public class CoordinatorsEndpoint {
     }
 
     @PATCH
-    @Path("/update/{coordinator_uuid}")
+    @Path("/{coordinator_uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)

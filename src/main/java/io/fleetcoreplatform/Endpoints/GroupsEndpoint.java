@@ -122,7 +122,6 @@ public class GroupsEndpoint {
     }
 
     @POST
-    @Path("/create/")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
@@ -155,7 +154,7 @@ public class GroupsEndpoint {
     }
 
     @DELETE
-    @Path("/delete/{group_uuid}")
+    @Path("/{group_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
     public Response deleteGroup(@PathParam("group_uuid") UUID group_uuid) {
@@ -178,7 +177,7 @@ public class GroupsEndpoint {
     }
 
     @PATCH
-    @Path("/update/{group_uuid}")
+    @Path("/{group_uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 3, window = 1, windowUnit = ChronoUnit.MINUTES)
