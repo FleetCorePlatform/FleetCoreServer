@@ -28,7 +28,7 @@ import org.jboss.resteasy.reactive.NoCache;
 // TODO: Implement row-level authentication on drones endpoint (#29)
 
 @NoCache
-@Path("/api/v1/drones/")
+@Path("/api/v1/drones")
 @RolesAllowed("${allowed.role-name}")
 public class DronesEndpoint {
     @Inject CoreService coreService;
@@ -110,12 +110,14 @@ public class DronesEndpoint {
                 || body.groupName() == null
                 || body.droneName() == null
                 || body.address() == null
-                || body.px4Version() == null
                 || body.agentVersion() == null
                 || body.homePosition() == null
                 || body.homePosition().x() == null
                 || body.homePosition().y() == null
-                || body.homePosition().z() == null) {
+                || body.homePosition().z() == null
+                || body.model() == null
+                || body.capabilities() == null
+                || body.capabilities().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
@@ -125,9 +127,10 @@ public class DronesEndpoint {
                             body.groupName(),
                             body.droneName(),
                             body.address(),
-                            body.px4Version(),
                             body.agentVersion(),
-                            body.homePosition());
+                            body.homePosition(),
+                            body.model(),
+                            body.capabilities());
 
             return Response.ok(certs).build();
         } catch (NotFoundException nfe) {

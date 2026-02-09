@@ -1,7 +1,10 @@
 package io.fleetcoreplatform.Managers.Database.DbModels;
 
 import io.fleetcoreplatform.Models.DroneHomePositionModel;
+
+import java.sql.Array;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.UUID;
 import org.postgis.Point;
 
@@ -13,6 +16,8 @@ public class DbDrone {
     private String manager_version;
     private Timestamp first_discovered;
     private DroneHomePositionModel home_position;
+    private String model;
+    private List<String> capabilities;
 
     public UUID getUuid() {
         return uuid;
@@ -69,5 +74,21 @@ public class DbDrone {
     public void setHome_position(Point home_position) {
         this.home_position =
                 new DroneHomePositionModel(home_position.x, home_position.y, home_position.z);
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public List<String> getCapabilities() {
+        return capabilities;
+    }
+
+    public void setCapabilities(List<String> capabilities) {
+        this.capabilities = capabilities;
     }
 }

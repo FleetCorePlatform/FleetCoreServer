@@ -47,16 +47,16 @@ public class CoreService {
      * @param group The name of the groups to create the drone in
      * @param droneName Desired name of the drone
      * @param address Public IP address of the drone
-     * @param px4Version PX4 firmware version running on the pixhawk hardware
      * @param agentVersion Version of the OnboardAgent client
      */
     public IoTCertContainer registerNewDrone(
             String group,
             String droneName,
             String address,
-            String px4Version,
             String agentVersion,
-            DroneHomePositionModel homePosition)
+            DroneHomePositionModel homePosition,
+            String model,
+            List<String> capabilities)
             throws NotFoundException {
         DbGroup dbGroup = groupMapper.findByName(group);
 
@@ -67,7 +67,7 @@ public class CoreService {
         UUID uuid = UUID.randomUUID();
 
         IoTCertContainer certContainer = iotManager.generateCertificate();
-        iotManager.createThing(droneName, px4Version, agentVersion);
+        iotManager.createThing(droneName, agentVersion);
 
         String policyName = iotManager.createPolicy(droneName);
         iotManager.attachPolicyToCertificate(certContainer.getCertificateARN(), policyName);
@@ -80,7 +80,7 @@ public class CoreService {
         UUID groupUUID = dbGroup.getUuid();
         Timestamp addedDate = new Timestamp(System.currentTimeMillis());
         droneMapper.insertDrone(
-                uuid, droneName, groupUUID, address, agentVersion, addedDate, homePosition);
+                uuid, droneName, groupUUID, address, agentVersion, addedDate, homePosition, model, capabilities);
 
         return certContainer;
     }
@@ -315,7 +315,7 @@ public class CoreService {
                         area, droneIdentities.toArray(new DroneIdentity[0]), missionAltitude);
         String key = storageManager.uploadMissionBundle(missionPath, missionBundle);
 
-        String presignedUrl = storageManager.getPresignedObjectUrl(key);
+        String presignedUrl = storageManager.getPresignedObjectUrl(key, 20);
 
         String groupARN = iotManager.getGroupARN(group);
 

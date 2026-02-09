@@ -175,7 +175,7 @@ public class IotManager {
         future.join();
     }
 
-    public void createThing(String thingName, String px4Version, String agentVersion) {
+    public void createThing(String thingName, String agentVersion) {
         CreateThingRequest createThingRequest =
                 CreateThingRequest.builder()
                         .thingName(thingName)
@@ -184,7 +184,6 @@ public class IotManager {
                                 AttributePayload.builder()
                                         .attributes(
                                                 Map.ofEntries(
-                                                        Map.entry("px4_version", px4Version),
                                                         Map.entry("agent_version", agentVersion)))
                                         .build())
                         .build();
