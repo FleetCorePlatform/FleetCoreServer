@@ -5,10 +5,7 @@ import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
 import io.fleetcoreplatform.Managers.SQS.SqsManager;
-import io.fleetcoreplatform.Models.CreateMissionRequestModel;
-import io.fleetcoreplatform.Models.DroneExecutionStatusResponseModel;
-import io.fleetcoreplatform.Models.MissionCreatedResponseModel;
-import io.fleetcoreplatform.Models.MissionExecutionStatusModel;
+import io.fleetcoreplatform.Models.*;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
@@ -21,6 +18,8 @@ import jakarta.ws.rs.core.Response;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.jboss.logging.Logger;
 import software.amazon.awssdk.services.iot.model.IotException;
 
@@ -74,10 +73,10 @@ public class MissionsEndpoint {
     }
 
     @PATCH
-    @Path("/cancel/{mission-uuid}")
+    @Path("/{mission-uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response cancelMission(@PathParam("mission-uuid") UUID missionUUID) {
+    public Response cancelMission(@PathParam("mission-uuid") UUID missionUUID, @RequestBody CancelMissionBodyModel body) {
         // TODO: Implement mission cancel logic (#17)
         return Response.status(Response.Status.NOT_IMPLEMENTED).build();
     }
