@@ -1,6 +1,7 @@
 package io.fleetcoreplatform.Endpoints;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
+import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.CreateOutpostModel;
 import io.fleetcoreplatform.Models.OutpostGroupSummary;
@@ -27,6 +28,7 @@ import org.jboss.logging.Logger;
 // @RolesAllowed("${allowed.role-name}")
 public class OutpostsEndpoint {
     @Inject OutpostMapper outpostMapper;
+    @Inject CoordinatorMapper coordinatorMapper;
     @Inject SecurityIdentity identity;
     @Inject Logger logger;
 
@@ -40,9 +42,14 @@ public class OutpostsEndpoint {
                 || body.name() == null
                 || body.latitude() == null
                 || body.longitude() == null
-                || body.coordinatorUUID() == null
                 || body.area() == null
                 || body.area().points.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+        String cognitoSub = identity.getPrincipal().getName();
+        var coordinator = coordinatorMapper.findByCognitoSub(cognitoSub);
+
+        if (coordinator == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
@@ -63,7 +70,7 @@ public class OutpostsEndpoint {
                     body.longitude(),
                     body.latitude(),
                     areaWkt,
-                    body.coordinatorUUID(),
+                    coordinator.getUuid(),
                     timestamp);
 
             return Response.created(URI.create(String.format("/api/v1/outposts/%s", uuid))).build();
@@ -124,7 +131,7 @@ public class OutpostsEndpoint {
             }
 
             List<OutpostGroupSummary> groupSummaries = outpostMapper.findGroupsByOutpostAndCoordinator(outpostUUID, cognitoSub);
-            OutpostSummary summary = new OutpostSummary(outpost.getName(), outpost.getLatitude(), outpost.getLongitude(), outpost.getCreated_at(), groupSummaries, outpost.getArea());
+            OutpostSummary summary = new OutpostSummary(outpost.getName(), outpost.getUuid(), outpost.getLatitude(), outpost.getLongitude(), outpost.getCreated_at(), groupSummaries, outpost.getArea());
 
             return Response.ok(summary).build();
         } catch (Exception e) {

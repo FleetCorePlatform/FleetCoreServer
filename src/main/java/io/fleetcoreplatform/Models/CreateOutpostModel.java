@@ -7,5 +7,4 @@ public record CreateOutpostModel(
         String name,
         BigDecimal latitude,
         BigDecimal longitude,
-        OutpostAreaModel area,
-        UUID coordinatorUUID) {}
+        OutpostAreaModel area) {}
