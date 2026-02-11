@@ -13,7 +13,7 @@ import org.apache.ibatis.annotations.*;
 public interface GroupMapper {
     @Insert(
             "INSERT INTO groups (uuid, outpost_uuid, name, created_at) VALUES (#{uuid,"
-                    + " jdbcType=OTHER}, #{outpost_uuid}, #{name}, #{created_at})")
+                    + " jdbcType=OTHER}, #{outpost_uuid, jdbcType=OTHER}, #{name}, #{created_at})")
     void insert(
             @Param("uuid") UUID uuid,
             @Param("outpost_uuid") UUID outpost_uuid,

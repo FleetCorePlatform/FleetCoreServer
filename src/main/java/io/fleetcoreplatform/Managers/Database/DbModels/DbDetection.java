@@ -8,6 +8,9 @@ public class DbDetections {
     private UUID uuid;
     private UUID mission_uuid;
     private UUID detected_by_drone_uuid;
+    private String object;
+    private Float confidence;
+    private Boolean false_positive;
     private Timestamp detected_at;
     private Point location;
     private String image_key;
@@ -34,6 +37,30 @@ public class DbDetections {
 
     public void setDetected_by_drone_uuid(UUID detected_by_drone_uuid) {
         this.detected_by_drone_uuid = detected_by_drone_uuid;
+    }
+
+    public String getObject() {
+        return object;
+    }
+
+    public void setObject(String object) {
+        this.object = object;
+    }
+
+    public Float getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(Float confidence) {
+        this.confidence = confidence;
+    }
+
+    public Boolean getFalse_positive() {
+        return false_positive;
+    }
+
+    public void setFalse_positive(Boolean false_positive) {
+        this.false_positive = false_positive;
     }
 
     public Timestamp getDetected_at() {
