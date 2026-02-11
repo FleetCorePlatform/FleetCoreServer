@@ -32,7 +32,6 @@ import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/groups")
-// @RolesAllowed("${allowed.role-name}")
 public class GroupsEndpoint {
     @Inject GroupMapper groupMapper;
     @Inject OutpostMapper outpostMapper;
