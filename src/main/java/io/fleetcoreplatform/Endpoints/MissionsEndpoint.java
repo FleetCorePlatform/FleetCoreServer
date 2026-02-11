@@ -1,7 +1,6 @@
 package io.fleetcoreplatform.Endpoints;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
 import io.fleetcoreplatform.Managers.SQS.SqsManager;
@@ -9,7 +8,6 @@ import io.fleetcoreplatform.Models.*;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
-import jakarta.annotation.Nullable;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -83,17 +81,11 @@ public class MissionsEndpoint {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllMissions(@Nullable @QueryParam("outpost_uuid") UUID outpostUuid) {
+    public Response getAllMissionSummaries(@QueryParam("group_uuid") UUID groupUuid) {
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<DbMission> missions;
-            if (outpostUuid != null) {
-                missions = missionMapper.listMissionsByCoordinatorAndOutpost(cognitoSub, outpostUuid);
-            } else {
-                missions = missionMapper.listByCoordinator(cognitoSub);
-            }
-
+            List<MissionSummary> missions = missionMapper.selectMissionSummariesByGroupAndCoordinator(groupUuid, cognitoSub);
             if (missions == null) {
                 return Response.status(Response.Status.NO_CONTENT).build();
             }
@@ -103,6 +95,7 @@ public class MissionsEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
+            logger.error(e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

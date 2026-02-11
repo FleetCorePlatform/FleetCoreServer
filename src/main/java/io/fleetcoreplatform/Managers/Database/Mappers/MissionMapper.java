@@ -4,6 +4,8 @@ import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
+
+import io.fleetcoreplatform.Models.MissionSummary;
 import org.apache.ibatis.annotations.*;
 
 @Mapper
@@ -55,4 +57,25 @@ public interface MissionMapper {
           AND c.cognito_sub = #{cognitoSub}
     """)
     List<DbMission> listMissionsByCoordinatorAndOutpost(String cognitoSub, UUID outpostUuid);
+
+    @Select("""
+        SELECT
+            m.name,
+            m.uuid AS missionUuid,
+            m.start_time AS startTime,
+            COUNT(d.uuid) AS detectionCount
+        FROM missions m
+        INNER JOIN groups g ON m.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        LEFT JOIN detections d ON m.uuid = d.mission_uuid
+        WHERE
+            g.uuid = #{groupUuid, jdbcType=OTHER}
+            AND c.cognito_sub = #{cognitoSub}
+        GROUP BY m.uuid, m.name, m.start_time
+    """)
+    List<MissionSummary> selectMissionSummariesByGroupAndCoordinator(
+        @Param("groupUuid") UUID groupUuid,
+        @Param("cognitoSub") String cognitoSub
+    );
 }
