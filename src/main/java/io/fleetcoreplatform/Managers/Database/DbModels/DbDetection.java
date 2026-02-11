@@ -2,9 +2,11 @@ package io.fleetcoreplatform.Managers.Database.DbModels;
 
 import java.sql.Timestamp;
 import java.util.UUID;
+
+import io.fleetcoreplatform.Models.PolygonPoint2DModel;
 import org.postgis.Point;
 
-public class DbDetections {
+public class DbDetection {
     private UUID uuid;
     private UUID mission_uuid;
     private UUID detected_by_drone_uuid;
@@ -12,7 +14,7 @@ public class DbDetections {
     private Float confidence;
     private Boolean false_positive;
     private Timestamp detected_at;
-    private Point location;
+    private PolygonPoint2DModel location;
     private String image_key;
 
     public UUID getUuid() {
@@ -71,11 +73,11 @@ public class DbDetections {
         this.detected_at = detected_at;
     }
 
-    public Point getLocation() {
+    public PolygonPoint2DModel getLocation() {
         return location;
     }
 
-    public void setLocation(Point location) {
+    public void setLocation(PolygonPoint2DModel location) {
         this.location = location;
     }
 
