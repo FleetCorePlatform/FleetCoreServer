@@ -2,6 +2,7 @@ package io.fleetcoreplatform.Managers.Database.Mappers;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbDroneMaintenance;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.*;
 
@@ -20,8 +21,39 @@ public interface DroneMaintenanceMapper {
             @Param("description") String description,
             @Param("performed_at") Timestamp performed_at);
 
-    @Select("SELECT * FROM drone_maintenance WHERE uuid = #{uuid, jdbcType=OTHER}")
-    DbDroneMaintenance findById(@Param("uuid") UUID uuid);
+    @Select("""
+        SELECT m.* FROM drone_maintenance m
+        INNER JOIN drones d ON m.drone_uuid = d.uuid
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE m.uuid = #{uuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    DbDroneMaintenance findByUuidAndCoordinator(@Param("uuid") UUID uuid, @Param("cognitoSub") String cognitoSub);
+
+    @Update("""
+        UPDATE drone_maintenance
+        SET performed_by = #{performed_by, jdbcType=OTHER},
+            performed_at = #{performed_at}
+        WHERE uuid = #{uuid, jdbcType=OTHER}
+    """)
+    void markAsComplete(DbDroneMaintenance maintenance);
+
+    @Select("""
+        SELECT m.uuid, m.drone_uuid, m.performed_by, m.maintenance_type, m.description, m.performed_at
+        FROM drone_maintenance m
+        INNER JOIN drones d ON m.drone_uuid = d.uuid
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE o.uuid = #{outpost_uuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognito_sub}
+    """)
+    List<DbDroneMaintenance> listByOutpostAndCoordinator(
+        @Param("outpost_uuid") UUID outpost_uuid,
+        @Param("cognito_sub") String cognitoSub
+    );
 
     @Update(
             "UPDATE drone_maintenance SET drone_uuid = #{drone_uuid, jdbcType=OTHER}, performed_by"
