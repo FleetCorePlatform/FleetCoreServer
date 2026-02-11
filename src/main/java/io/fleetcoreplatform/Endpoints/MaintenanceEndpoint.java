@@ -6,6 +6,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.DroneMaintenanceMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.DroneMapper;
 import io.fleetcoreplatform.Models.MaintenanceCreateRequestModel;
+import io.fleetcoreplatform.Models.MaintenanceSummary;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -14,6 +15,7 @@ import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.NoCache;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,7 +37,7 @@ public class MaintenanceEndpoint {
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<DbDroneMaintenance> maintenances = maintenanceMapper.listByOutpostAndCoordinator(outpost_uuid, cognitoSub);
+            List<MaintenanceSummary> maintenances = maintenanceMapper.listByOutpostAndCoordinator(outpost_uuid, cognitoSub);
 
             if (maintenances == null || maintenances.isEmpty()) {
                 return Response.status(Response.Status.NOT_FOUND).build();
@@ -63,7 +65,7 @@ public class MaintenanceEndpoint {
         }
 
         try {
-            maintenanceMapper.insert(UUID.randomUUID(), request.droneUuid(), null, request.type(), request.description(), null);
+            maintenanceMapper.insert(UUID.randomUUID(), request.droneUuid(), null, request.type(), request.description(), new Timestamp(System.currentTimeMillis()), null);
             return Response.noContent().build();
         } catch (Exception e) {
             logger.error(e);

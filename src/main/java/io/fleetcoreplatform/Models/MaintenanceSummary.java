@@ -1,11 +1,13 @@
-package io.fleetcoreplatform.Managers.Database.DbModels;
+package io.fleetcoreplatform.Models;
 
 import java.sql.Timestamp;
 import java.util.UUID;
 
-public class DbDroneMaintenance {
+public class MaintenanceSummary {
     private UUID uuid;
     private UUID drone_uuid;
+    private String drone_name;
+    private String drone_group_name;
     private UUID performed_by;
     private String maintenance_type;
     private String description;
@@ -24,8 +26,24 @@ public class DbDroneMaintenance {
         return drone_uuid;
     }
 
+    public void setDrone_name(String drone_name) {
+        this.drone_name = drone_name;
+    }
+
+    public String getDrone_name() {
+        return drone_name;
+    }
+
     public void setDrone_uuid(UUID drone_uuid) {
         this.drone_uuid = drone_uuid;
+    }
+
+    public String getDrone_group_name() {
+        return drone_group_name;
+    }
+
+    public void setDrone_group_name(String drone_group_name) {
+        this.drone_group_name = drone_group_name;
     }
 
     public UUID getPerformed_by() {
