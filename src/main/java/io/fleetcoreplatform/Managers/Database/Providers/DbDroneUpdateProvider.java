@@ -19,6 +19,12 @@ public class DbDroneUpdateProvider implements ProviderMethodResolver {
         if (drone.getGroup_uuid() != null) {
             query.append("group_uuid = #{drone.group_uuid, jdbcType=OTHER}, ");
         }
+        if (drone.getHome_position() != null) {
+            query.append("home_position = st_pointz(#{drone.home_position.x}, #{drone.home_position.y}, #{drone.home_position.z}), ");
+        }
+        if (drone.getCapabilities() != null) {
+            query.append("capabilities = #{drone.capabilities, typeHandler=io.fleetcoreplatform.Managers.Database.TypeHandlers.StringArrayTypeHandler}, ");
+        }
 
         query.setLength(query.length() - 2);
         query.append(" WHERE uuid = #{uuid, jdbcType=OTHER}");

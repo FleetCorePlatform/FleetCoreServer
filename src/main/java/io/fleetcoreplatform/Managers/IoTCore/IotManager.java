@@ -175,17 +175,11 @@ public class IotManager {
         future.join();
     }
 
-    public void createThing(String thingName, String agentVersion) {
+    public void createThing(String thingName) {
         CreateThingRequest createThingRequest =
                 CreateThingRequest.builder()
                         .thingName(thingName)
                         .thingTypeName(config.iot().thingType())
-                        .attributePayload(
-                                AttributePayload.builder()
-                                        .attributes(
-                                                Map.ofEntries(
-                                                        Map.entry("agent_version", agentVersion)))
-                                        .build())
                         .build();
 
         CompletableFuture<CreateThingResponse> future =

@@ -65,17 +65,18 @@ public class CoreService {
         }
 
         UUID uuid = UUID.randomUUID();
+        String thingName = uuid.toString();
 
         IoTCertContainer certContainer = iotManager.generateCertificate();
-        iotManager.createThing(droneName, agentVersion);
+        iotManager.createThing(thingName);
 
-        String policyName = iotManager.createPolicy(droneName);
+        String policyName = iotManager.createPolicy(thingName);
         iotManager.attachPolicyToCertificate(certContainer.getCertificateARN(), policyName);
 
-        iotManager.attachCertificate(droneName, certContainer.getCertificateARN());
+        iotManager.attachCertificate(thingName, certContainer.getCertificateARN());
 
         String groupARN = iotManager.getGroupARN(group);
-        iotManager.addDeviceToGroup(droneName, groupARN);
+        iotManager.addDeviceToGroup(thingName, groupARN);
 
         UUID groupUUID = dbGroup.getUuid();
         Timestamp addedDate = new Timestamp(System.currentTimeMillis());
@@ -91,10 +92,7 @@ public class CoreService {
             throw new NotFoundException("Drone not found with UUID " + droneUuid);
         }
 
-        DbGroup currentGroup = groupMapper.findByUuid(drone.getGroup_uuid());
-
-        String currentGroupARN = iotManager.getGroupARN(currentGroup.getName());
-        String newGroupARN = iotManager.getGroupARN(data.groupName());
+        String thingName = drone.getUuid().toString();
 
         if (data.address() != null) {
             drone.setAddress(data.address());
@@ -105,18 +103,51 @@ public class CoreService {
         if (data.agentVersion() != null) {
             drone.setManager_version(data.agentVersion());
         }
+        if (data.capabilities() != null) {
+            drone.setCapabilities(data.capabilities());
+        }
+        if (data.homePosition() != null) {
+            drone.setHome_position(
+                    new org.postgis.Point(
+                            data.homePosition().x(),
+                            data.homePosition().y(),
+                            data.homePosition().z()));
+        }
+
+        boolean groupChanged = false;
+        String currentGroupARN = null;
+        String newGroupARN = null;
+
         if (data.groupName() != null) {
-            DbGroup dbGroup = groupMapper.findByName(data.groupName());
-            if (dbGroup == null) {
+            DbGroup destinationGroup = groupMapper.findByName(data.groupName());
+            if (destinationGroup == null) {
                 throw new NotFoundException("Group not found with name " + data.groupName());
             }
-            drone.setGroup_uuid(dbGroup.getUuid());
+
+            if (drone.getGroup_uuid() == null
+                    || !drone.getGroup_uuid().equals(destinationGroup.getUuid())) {
+                newGroupARN = iotManager.getGroupARN(destinationGroup.getName());
+
+                if (drone.getGroup_uuid() != null) {
+                    DbGroup currentGroup = groupMapper.findByUuid(drone.getGroup_uuid());
+                    if (currentGroup != null) {
+                        currentGroupARN = iotManager.getGroupARN(currentGroup.getName());
+                    }
+                }
+
+                drone.setGroup_uuid(destinationGroup.getUuid());
+                groupChanged = true;
+            }
         }
 
         droneMapper.updateDrone(droneUuid, drone);
 
-        iotManager.removeThingFromGroup(drone.getName(), currentGroupARN);
-        iotManager.addDeviceToGroup(drone.getName(), newGroupARN);
+        if (groupChanged) {
+            if (currentGroupARN != null) {
+                iotManager.removeThingFromGroup(thingName, currentGroupARN);
+            }
+            iotManager.addDeviceToGroup(thingName, newGroupARN);
+        }
     }
 
     public void removeDrone(UUID droneUuid) throws NotFoundException {
@@ -125,20 +156,20 @@ public class CoreService {
             throw new NotFoundException("Drone not found with UUID " + droneUuid);
         }
 
-        String droneName = dbDrone.getName();
+        String thingName = dbDrone.getUuid().toString();
 
-        iotManager.detachCertificates(droneName);
-        iotManager.deleteCertificates(droneName);
+        iotManager.detachCertificates(thingName);
+        iotManager.deleteCertificates(thingName);
 
-        String groupARN = iotManager.getThingGroup(droneName);
+        String groupARN = iotManager.getThingGroup(thingName);
 
         if (groupARN != null) {
-            iotManager.removeThingFromGroup(droneName, groupARN);
+            iotManager.removeThingFromGroup(thingName, groupARN);
         } else {
-            System.err.printf("%s not in a group!", droneName);
+            System.err.printf("%s not in a group!", thingName);
         }
 
-        iotManager.removeThing(droneName);
+        iotManager.removeThing(thingName);
         droneMapper.deleteDrone(droneUuid);
     }
 
@@ -153,7 +184,7 @@ public class CoreService {
         }
 
         String groupARN = iotManager.getGroupARN(dbGroup.getName());
-        iotManager.removeThingFromGroup(dbDrone.getName(), groupARN);
+        iotManager.removeThingFromGroup(dbDrone.getUuid().toString(), groupARN);
 
         droneMapper.ungroupDrone(droneUUID);
     }
@@ -171,7 +202,7 @@ public class CoreService {
         String groupARN = iotManager.getGroupARN(dbGroup.getName());
 
         droneMapper.addToGroup(droneUUID, dbGroup.getUuid());
-        iotManager.addDeviceToGroup(dbDrone.getName(), groupARN);
+        iotManager.addDeviceToGroup(dbDrone.getUuid().toString(), groupARN);
     }
 
     public void createNewGroup(String groupName, UUID outpostUuid) throws NotFoundException {
@@ -354,13 +385,14 @@ public class CoreService {
 
             droneIdentities.add(
                     new DroneIdentity(
-                            drone.getName(), new DroneIdentity.Home(home.x(), home.y(), home.z())));
+                            drone.getUuid().toString(),
+                            new DroneIdentity.Home(home.x(), home.y(), home.z())));
         }
         return droneIdentities;
     }
 
-    public DroneExecutionStatusResponseModel getThingMissionStatus(UUID droneUuid, UUID missionUuid, String sub)
-            throws NotFoundException {
+    public DroneExecutionStatusResponseModel getThingMissionStatus(
+            UUID droneUuid, UUID missionUuid, String sub) throws NotFoundException {
         DbMission mission = missionMapper.findByIdAndCoordinator(missionUuid, sub);
         if (mission == null) {
             throw new NotFoundException("Mission not found with UUID " + missionUuid.toString());
@@ -371,14 +403,15 @@ public class CoreService {
             throw new NotFoundException("Drone not found with UUID " + droneUuid.toString());
         }
 
-        String thingName = drone.getName();
+        String thingName = drone.getUuid().toString();
 
         JobExecutionSummary executionSummary = iotManager.getThingJob(thingName, mission.getName());
         if (executionSummary == null) {
             return null;
         }
 
-        return new DroneExecutionStatusResponseModel(droneUuid, executionSummary.status(), Timestamp.from(executionSummary.lastUpdatedAt()));
+        return new DroneExecutionStatusResponseModel(
+                droneUuid, executionSummary.status(), Timestamp.from(executionSummary.lastUpdatedAt()));
     }
 
     public MissionExecutionStatusModel getMissionStatus(UUID missionUuid, String sub)
