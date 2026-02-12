@@ -14,6 +14,7 @@
                     quarkus
                     maven
                     awscli2
+		    just
                 ];
             };
         };
