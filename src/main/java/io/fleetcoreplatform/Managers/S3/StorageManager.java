@@ -158,29 +158,6 @@ public class StorageManager {
     public String getInternalObjectUrl(String key) {
         return "s3://" + config.s3().bucketName() + "/" + key;
     }
-    public String getPresignedUploadUrl(String missionUUID, String name, Integer valid_minutes) {
-        try (S3Presigner presigner = S3Presigner.create()) {
-            String objectKey = String.format("missions/%s/%s_%d.jpg",
-                missionUUID,
-                name,
-                System.currentTimeMillis()
-            );
-
-            PutObjectRequest objectRequest = PutObjectRequest.builder()
-                .bucket(config.s3().bucketName())
-                .key(objectKey)
-                .build();
-
-            PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(valid_minutes))
-                .putObjectRequest(objectRequest)
-                .build();
-
-            PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
-
-            return presignedRequest.url().toString();
-        }
-    }
 
     public String getPresignedObjectUrl(String key, Integer valid_minutes) {
         try (S3Presigner presigner = S3Presigner.create()) {
