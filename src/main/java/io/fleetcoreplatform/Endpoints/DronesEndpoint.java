@@ -1,16 +1,19 @@
 package io.fleetcoreplatform.Endpoints;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbDrone;
 import io.fleetcoreplatform.Managers.Database.Mappers.DroneMapper;
-import io.fleetcoreplatform.Models.DroneRequestModel;
-import io.fleetcoreplatform.Models.IoTCertContainer;
-import io.fleetcoreplatform.Models.SetDroneGroupRequestModel;
+import io.fleetcoreplatform.Managers.IoTCore.IotDataPlaneManager;
+import io.fleetcoreplatform.Managers.IoTCore.IotManager;
+import io.fleetcoreplatform.Models.*;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.annotation.Nullable;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.json.Json;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -18,6 +21,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
+
+import org.apache.camel.Body;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -33,6 +38,8 @@ import org.jboss.resteasy.reactive.NoCache;
 public class DronesEndpoint {
     @Inject CoreService coreService;
     @Inject DroneMapper droneMapper;
+    @Inject IotManager iotManager;
+    @Inject IotDataPlaneManager iotPublisher;
     @Inject SecurityIdentity identity;
     Logger logger = Logger.getLogger(DronesEndpoint.class.getName());
 
@@ -94,7 +101,10 @@ public class DronesEndpoint {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
-            return Response.ok(drone).build();
+            var uptime = iotManager.getDroneStatus(drone.getName());
+
+            var response = new DroneFullModel(drone.getUuid(), drone.getName(), drone.getGroup_uuid(), drone.getAddress(), drone.getManager_version(), drone.getFirst_discovered(), drone.getHome_position(), drone.getModel(), drone.getCapabilities(), uptime);
+            return Response.ok(response).build();
         } catch (Exception e) {
             logger.severe(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
@@ -237,6 +247,37 @@ public class DronesEndpoint {
         } catch (Exception e) {
             logger.severe(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @Path("/{drone_uuid}/stream")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response setDroneStreaming(@PathParam("drone_uuid") UUID droneUuid, @Body DroneStreamingRequestModel body) {
+        if (body == null || body.enabled() == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+        DbDrone droneCheck = droneMapper.findByUuidAndCoordinator(droneUuid, cognitoSub);
+
+        if (droneCheck == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        try {
+            String jsonString = mapper.writeValueAsString(body);
+            iotPublisher.publish("devices/" + droneUuid.toString() + "/stream", jsonString, 1);
+
+            return Response.noContent().build();
+        } catch (JsonProcessingException e) {
+            logger.severe(e.getMessage());
+            return Response.notModified().build();
+        } catch (Exception e) {
+            logger.severe(e.getMessage());
+            return Response.serverError().build();
         }
     }
 }
