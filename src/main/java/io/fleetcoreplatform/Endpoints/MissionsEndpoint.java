@@ -71,10 +71,10 @@ public class MissionsEndpoint {
     }
 
     @PATCH
-    @Path("/{mission-uuid}")
+    @Path("/{mission_uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response cancelMission(@PathParam("mission-uuid") UUID missionUUID, @RequestBody CancelMissionBodyModel body) {
+    public Response cancelMission(@PathParam("mission_uuid") UUID missionUUID, @RequestBody CancelMissionBodyModel body) {
         // TODO: Implement mission cancel logic (#17)
         return Response.status(Response.Status.NOT_IMPLEMENTED).build();
     }
@@ -101,9 +101,9 @@ public class MissionsEndpoint {
     }
 
     @GET
-    @Path("/{mission-uuid}")
+    @Path("/{mission_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getMissionStatus(@PathParam("mission-uuid") UUID missionUUID)
+    public Response getMissionStatus(@PathParam("mission_uuid") UUID missionUUID)
             throws NotFoundException {
         String cognitoSub = identity.getPrincipal().getName();
 
@@ -119,14 +119,15 @@ public class MissionsEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
+            logger.error(e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @GET
-    @Path("/{mission-uuid}/{drone-uuid}")
+    @Path("/{mission_uuid}/{drone_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getThingMissionStatus(@PathParam("mission-uuid") UUID missionUUID, @PathParam("drone-uuid") UUID droneUUID)
+    public Response getThingMissionStatus(@PathParam("mission_uuid") UUID missionUUID, @PathParam("drone_uuid") UUID droneUUID)
             throws NotFoundException {
         String cognitoSub = identity.getPrincipal().getName();
 
