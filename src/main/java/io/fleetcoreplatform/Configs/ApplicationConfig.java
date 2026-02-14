@@ -37,6 +37,9 @@ public interface ApplicationConfig {
 
         @WithName("new-mission-job-arn")
         String newMissionJobArn();
+
+        @WithName("role-alias")
+        String roleAlias();
     }
 
     interface CognitoConfig {

@@ -1,7 +1,35 @@
 package io.fleetcoreplatform.Managers.IoTCore;
 
-public class IotPolicyMaker {
-    public static String buildPolicyDocument(String accountId, String region) {
+import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
+
+public class IotDocumentBuilder {
+    public static String buildJobDocument(MissionDocumentEnums action, String missionName, String downloadUrl, String filePath, String outpost, String group, String bucket) {
+         String template =
+                """
+            {
+              "operation": "${action}",
+              "mission_uuid": "${missionName}",
+              "download_url": "${downloadUrl}",
+              "download_path": "${filePath}",
+              "metadata": {
+                "outpost": "${outpost}",
+                "group": "${group}",
+                "bucket": "${bucket}"
+              }
+            }
+            """;
+
+        return template
+                .replace("${action}", action.toString())
+                .replace("${missionName}", missionName)
+                .replace("${downloadUrl}", downloadUrl)
+                .replace("${filePath}", filePath)
+                .replace("${outpost}", outpost)
+                .replace("${group}", group)
+                .replace("${bucket}", bucket);
+    }
+
+    public static String buildPolicyDocument(String accountId, String region, String roleAlias) {
         // TODO: Fix policy template that does not grant sufficient permissions (#20)
         String template =
                 """
@@ -43,11 +71,16 @@ public class IotPolicyMaker {
                       "iotjobsdata:StartNextPendingJobExecution"
                     ],
                     "Resource": "arn:aws:iot:${region}:${accountId}:thing/${iot:Connection.Thing.ThingName}"
+                  },
+                  {
+                    "Effect": "Allow",
+                    "Action": "iot:AssumeRoleWithCertificate",
+                    "Resource": "arn:aws:iot:${region}:${accountId}:rolealias/${roleAlias}"
                   }
                 ]
               }
             """;
 
-        return template.replace("${region}", region).replace("${accountId}", accountId);
+        return template.replace("${region}", region).replace("${accountId}", accountId).replace("${roleAlias}", roleAlias);
     }
 }

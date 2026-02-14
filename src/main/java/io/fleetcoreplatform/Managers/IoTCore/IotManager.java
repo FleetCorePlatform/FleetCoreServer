@@ -1,14 +1,14 @@
 package io.fleetcoreplatform.Managers.IoTCore;
 
 import io.fleetcoreplatform.Configs.ApplicationConfig;
+import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
+import io.fleetcoreplatform.Models.DroneStatusModel;
 import io.fleetcoreplatform.Models.IoTCertContainer;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
@@ -53,7 +53,7 @@ public class IotManager {
     public String createPolicy(String thingName) throws CompletionException {
         String policyName = thingName + "-policy";
         String policyDocument =
-                IotPolicyMaker.buildPolicyDocument(accountIdentifier, config.region());
+                IotDocumentBuilder.buildPolicyDocument(accountIdentifier, config.region(), config.iot().roleAlias());
 
         CreatePolicyRequest createPolicyRequest =
                 CreatePolicyRequest.builder()
@@ -396,17 +396,22 @@ public class IotManager {
     }
 
     public void createIoTJob(
-            String jobName,
             String groupARN,
-            String templateARN,
-            Map<String, String> missionParameters) {
+            MissionDocumentEnums action,
+            String jobName,
+            String downloadUrl,
+            String filePath,
+            String outpost,
+            String group,
+            String bucket) {
+        String jobDocument = IotDocumentBuilder.buildJobDocument(action, jobName, downloadUrl, filePath, outpost, group, bucket);
+
         CreateJobRequest createJobRequest =
                 CreateJobRequest.builder()
                         .jobId(jobName)
                         .targets(groupARN)
                         .targetSelection(TargetSelection.SNAPSHOT)
-                        .jobTemplateArn(templateARN)
-                        .documentParameters(missionParameters)
+                        .document(jobDocument)
                         .build();
 
         CompletableFuture<CreateJobResponse> future = iotAsyncClient.createJob(createJobRequest);
@@ -476,5 +481,25 @@ public class IotManager {
                 });
 
         future.join();
+    }
+
+    public DroneStatusModel getDroneStatus(String deviceName) {
+        SearchIndexRequest request = SearchIndexRequest.builder()
+                .indexName("AWS_Things")
+                .queryString("thingName:\"" + deviceName + "\"")
+                .build();
+
+        SearchIndexResponse indexResponse = iotAsyncClient.searchIndex(request).join();
+
+        if (indexResponse.hasThings() && !indexResponse.things().isEmpty()) {
+            ThingDocument thing = indexResponse.things().getFirst();
+
+            if (thing.connectivity() != null) {
+                return new DroneStatusModel(thing.connectivity().timestamp(), thing.connectivity().connected());
+            }
+
+            return new DroneStatusModel(null, false);
+        }
+        return null;
     }
 }

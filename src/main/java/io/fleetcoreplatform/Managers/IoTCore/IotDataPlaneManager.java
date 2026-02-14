@@ -31,14 +31,14 @@ public class IotDataPlaneManager {
         iotDataPlaneClient.close();
     }
 
-    public void publish(String topic, String payload) {
+    public void publish(String topic, String payload, int QoS) {
         String jsonPayload = Json.createObjectBuilder().add("message", payload).build().toString();
 
         PublishRequest publishRequest =
                 PublishRequest.builder()
                         .topic(topic)
                         .payload(SdkBytes.fromString(jsonPayload, StandardCharsets.UTF_8))
-                        .qos(0)
+                        .qos(QoS)
                         .contentType("application/json")
                         .build();
 

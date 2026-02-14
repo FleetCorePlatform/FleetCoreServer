@@ -1,6 +1,7 @@
 package io.fleetcoreplatform.Services;
 
 import io.fleetcoreplatform.Configs.ApplicationConfig;
+import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
 import io.fleetcoreplatform.Models.DroneIdentity;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Cognito.CognitoManager;
@@ -346,7 +347,7 @@ public class CoreService {
                         area, droneIdentities.toArray(new DroneIdentity[0]), missionAltitude);
         String key = storageManager.uploadMissionBundle(missionPath, missionBundle);
 
-        String presignedUrl = storageManager.getPresignedObjectUrl(key, 20);
+        String downloadUrl = storageManager.getPresignedObjectUrl(key, 30);
 
         String groupARN = iotManager.getGroupARN(group);
 
@@ -355,12 +356,14 @@ public class CoreService {
         // Create 'Download-File' mission -> download mission file from url and execute mission from
         // it
         iotManager.createIoTJob(
-                iotMissionName,
                 groupARN,
-                config.iot().newMissionJobArn(),
-                Map.ofEntries(
-                        Map.entry("downloadUrl", presignedUrl),
-                        Map.entry("filePath", "/tmp/missions/")));
+                MissionDocumentEnums.DOWNLOAD,
+                iotMissionName,
+                downloadUrl,
+                "/tmp/missions/",
+                outpost,
+                group,
+                config.s3().bucketName());
 
         String bundleUrl = storageManager.getInternalObjectUrl(key);
 
@@ -423,6 +426,6 @@ public class CoreService {
 
         Job job = iotManager.getJob(mission.getName());
 
-        return new MissionExecutionStatusModel(job.status(), mission.getStart_time(), Timestamp.from(job.completedAt()));
+        return new MissionExecutionStatusModel(job.status(), mission.getStart_time(), job.completedAt() != null ? Timestamp.from(job.completedAt()) : null);
     }
 }
