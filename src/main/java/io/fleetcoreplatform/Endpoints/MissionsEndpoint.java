@@ -1,10 +1,8 @@
 package io.fleetcoreplatform.Endpoints;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
-import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
-import io.fleetcoreplatform.Managers.SQS.SqsManager;
 import io.fleetcoreplatform.Models.*;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -15,10 +13,10 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.jboss.logging.Logger;
 import software.amazon.awssdk.services.iot.model.IotException;
 
@@ -26,8 +24,6 @@ import software.amazon.awssdk.services.iot.model.IotException;
 @RolesAllowed("${allowed.role-name}")
 public class MissionsEndpoint {
     @Inject CoreService coreService;
-    @Inject
-    SqsManager sqsManager;
     @Inject MissionMapper missionMapper;
     @Inject SecurityIdentity identity;
 
@@ -116,15 +112,26 @@ public class MissionsEndpoint {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllMissionSummariesForGroup(@QueryParam("group_uuid") UUID groupUuid) {
+    public Response getAllMissionSummariesForGroup(@QueryParam("group_uuid") UUID groupUuid, @QueryParam("count") Integer count) {
+        if (groupUuid == null && count == null || groupUuid != null && count != null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<MissionSummary> missions = missionMapper.selectMissionSummariesByGroupAndCoordinator(groupUuid, cognitoSub);
+
+            List<MissionSummary> missions;
+            if (groupUuid != null) {
+                missions = missionMapper.selectMissionSummariesByGroupAndCoordinator(groupUuid, cognitoSub);
+
+            } else {
+                missions = missionMapper.selectLatestMissionSummariesByCoordinator(cognitoSub, count);
+
+            }
             if (missions == null) {
                 return Response.status(Response.Status.NO_CONTENT).build();
             }
-
             return Response.ok(missions).build();
 
         } catch (NotFoundException nfe) {
@@ -136,26 +143,18 @@ public class MissionsEndpoint {
     }
 
     @GET
+    @Path("/count")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllMissionSummariesForCoordinator(@QueryParam("count") Integer count) {
-        if (count == null) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
-        }
-
+    public Response getMissionCount() {
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<MissionSummary> missions = missionMapper.selectLatestMissionSummariesByCoordinator(cognitoSub, count);
-            if (missions == null) {
-                return Response.status(Response.Status.NO_CONTENT).build();
-            }
+            int totalMissions = missionMapper.countMissionsByCoordinator(cognitoSub);
 
-            return Response.ok(missions).build();
+            return Response.ok(Collections.singletonMap("count", totalMissions)).build();
 
-        } catch (NotFoundException nfe) {
-            return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
-            logger.error(e);
+            logger.error("Failed to count missions", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

@@ -118,4 +118,14 @@ public interface MissionMapper {
         @Param("cognitoSub") String cognitoSub,
         @Param("count") Integer count
     );
+
+    @Select("""
+        SELECT COUNT(*)
+        FROM missions m
+        INNER JOIN groups g ON m.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON m.created_by = c.uuid
+        WHERE c.cognito_sub = #{cognitoSub}
+    """)
+    int countMissionsByCoordinator(String cognitoSub);
 }
