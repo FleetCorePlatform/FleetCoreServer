@@ -78,4 +78,26 @@ public interface MissionMapper {
         @Param("groupUuid") UUID groupUuid,
         @Param("cognitoSub") String cognitoSub
     );
+
+    @Select("""
+        SELECT
+            m.name,
+            m.uuid AS missionUuid,
+            m.start_time AS startTime,
+            COUNT(d.uuid) AS detectionCount
+        FROM missions m
+        INNER JOIN groups g ON m.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        LEFT JOIN detections d ON m.uuid = d.mission_uuid
+        WHERE
+            c.cognito_sub = #{cognitoSub}
+        GROUP BY m.uuid, m.name, m.start_time
+        ORDER BY m.start_time DESC
+        LIMIT #{count}
+    """)
+    List<MissionSummary> selectLatestMissionSummariesByCoordinator(
+        @Param("cognitoSub") String cognitoSub,
+        @Param("count") Integer count
+    );
 }
