@@ -10,6 +10,7 @@ import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesisvideo.KinesisVideoAsyncClient;
+import software.amazon.awssdk.services.kinesisvideo.KinesisVideoClient;
 import software.amazon.awssdk.services.kinesisvideo.model.*;
 
 import java.time.Duration;
@@ -44,6 +45,10 @@ public class KinesisVideoManager {
     @PreDestroy
     void destroy() {
         kinesisAsyncClient.close();
+    }
+
+    public KinesisVideoAsyncClient getClient() {
+        return kinesisAsyncClient;
     }
 
     public UUID createSignalingChannel(UUID droneUuid) {
