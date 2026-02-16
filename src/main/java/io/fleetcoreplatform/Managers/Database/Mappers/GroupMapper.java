@@ -69,6 +69,7 @@ public interface GroupMapper {
             d.manager_version,
             d.first_discovered,
             d.home_position,
+            d.signaling_channel_name,
             CASE
                 WHEN EXISTS (
                     SELECT 1 FROM drone_maintenance dm
@@ -97,7 +98,8 @@ public interface GroupMapper {
         @Result(property = "home_position", column = "home_position", typeHandler = DroneHomePositionTypeHandler.class),
         @Result(property = "maintenance", column = "maintenance"),
         @Result(property = "remaining_percent", column = "remaining_percent"),
-        @Result(property = "inFlight", column = "in_flight")
+        @Result(property = "inFlight", column = "in_flight"),
+        @Result(property = "signaling_channel_name", column = "signaling_channel_name"),
     })
     List<DroneSummaryModel> listDronesByGroupAndCoordinator(
         @Param("groupUuid") UUID groupUuid,

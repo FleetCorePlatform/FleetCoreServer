@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 
+import io.fleetcoreplatform.Models.MissionCancellationContext;
 import io.fleetcoreplatform.Models.MissionSummary;
 import org.apache.ibatis.annotations.*;
 
@@ -77,5 +78,22 @@ public interface MissionMapper {
     List<MissionSummary> selectMissionSummariesByGroupAndCoordinator(
         @Param("groupUuid") UUID groupUuid,
         @Param("cognitoSub") String cognitoSub
+    );
+
+    @Select("""
+        SELECT
+            m.uuid as missionUuid,
+            m.group_uuid as groupUuid,
+            o.uuid as outpostUuid
+        FROM missions m
+        INNER JOIN groups g ON m.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON m.created_by = c.uuid
+        WHERE m.uuid = #{missionUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    MissionCancellationContext findCancellationContext(
+            @Param("missionUuid") UUID missionUuid,
+            @Param("cognitoSub") String cognitoSub
     );
 }

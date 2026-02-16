@@ -18,6 +18,7 @@ public class DbDrone {
     private DroneHomePositionModel home_position;
     private String model;
     private List<String> capabilities;
+    private String signaling_channel_name;
 
     public UUID getUuid() {
         return uuid;
@@ -90,5 +91,12 @@ public class DbDrone {
 
     public void setCapabilities(List<String> capabilities) {
         this.capabilities = capabilities;
+    }
+
+    public String getSignaling_channel_name() {
+        return signaling_channel_name;
+    }
+    public void setSignaling_channel_name(String signaling_channel_name) {
+        this.signaling_channel_name = signaling_channel_name;
     }
 }

@@ -14,13 +14,14 @@ public class DroneSummaryModel {
     private Boolean maintenance;
     private Double remaining_percent;
     private Boolean inFlight;
+    private String signaling_channel_name;
 
     public DroneSummaryModel() {}
 
     public DroneSummaryModel(UUID uuid, String name, String group_name, String address,
                             String manager_version, Timestamp first_discovered,
                             DroneHomePositionModel home_position, Boolean maintenance,
-                            Double remaining_percent, Boolean inFlight) {
+                            Double remaining_percent, Boolean inFlight, String signaling_channel_name) {
         this.uuid = uuid;
         this.name = name;
         this.group_name = group_name;
@@ -31,9 +32,9 @@ public class DroneSummaryModel {
         this.maintenance = maintenance;
         this.remaining_percent = remaining_percent;
         this.inFlight = inFlight;
+        this.signaling_channel_name = signaling_channel_name;
     }
 
-    // Getters - JavaBeans style
     public UUID getUuid() { return uuid; }
     public String getName() { return name; }
     public String getGroup_name() { return group_name; }
@@ -44,6 +45,7 @@ public class DroneSummaryModel {
     public Boolean getMaintenance() { return maintenance; }
     public Double getRemaining_percent() { return remaining_percent; }
     public Boolean getInFlight() { return inFlight; }
+    public String getSignaling_channel_name() { return signaling_channel_name; }
 
     // Setters
     public void setUuid(UUID uuid) { this.uuid = uuid; }
@@ -56,4 +58,5 @@ public class DroneSummaryModel {
     public void setMaintenance(Boolean maintenance) { this.maintenance = maintenance; }
     public void setRemaining_percent(Double remaining_percent) { this.remaining_percent = remaining_percent; }
     public void setInFlight(Boolean inFlight) { this.inFlight = inFlight; }
+    public void setSignaling_channel_name(String signaling_channel_name) { this.signaling_channel_name = signaling_channel_name; }
 }

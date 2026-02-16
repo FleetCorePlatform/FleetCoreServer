@@ -86,4 +86,12 @@ public interface OutpostMapper {
         @Param("outpostUuid") UUID outpostUuid,
         @Param("cognitoSub") String cognitoSub
     );
+
+    @Update(
+        "UPDATE outposts SET area = ST_GeomFromText(#{area}, 4326) WHERE uuid = #{uuid, jdbcType=OTHER}"
+    )
+    void updateArea(
+        @Param("uuid") UUID uuid,
+        @Param("area") String area
+    );
 }
