@@ -44,7 +44,7 @@ public class GroupsEndpoint {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @RateLimit(value = 10, window = 1, windowUnit = ChronoUnit.MINUTES)
+    @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
     public Response getGroups(
         @Nullable @QueryParam("outpost_uuid") UUID outpostUuid,
         @Nullable @QueryParam("group_uuid") UUID groupUuid,
@@ -91,7 +91,8 @@ public class GroupsEndpoint {
                                 drone.getHome_position(),
                                 drone.getMaintenance(),
                                 telem.battery().remaining_percent(),
-                                true
+                                true,
+                                drone.getSignaling_channel_name()
                             );
                         }
                         return new DroneSummaryModel(
@@ -104,7 +105,8 @@ public class GroupsEndpoint {
                             drone.getHome_position(),
                             drone.getMaintenance(),
                             null,
-                            false
+                            false,
+                            drone.getSignaling_channel_name()
                         );
                     })
                     .toList();
@@ -116,6 +118,23 @@ public class GroupsEndpoint {
 
         } catch (Exception e) {
             logger.error("Error while listing groups", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
+    @Path("/{group_uuid}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
+    public Response getGroup(@PathParam("group_uuid") UUID group_uuid) {
+        try {
+            DbGroup group = groupMapper.findByUuid(group_uuid);
+            if (group == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            return Response.ok(group).build();
+        } catch (Exception e) {
+            logger.error("Error fetching group details", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

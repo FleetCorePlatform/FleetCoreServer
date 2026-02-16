@@ -4,6 +4,7 @@ import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.CreateOutpostModel;
+import io.fleetcoreplatform.Models.OutpostGeofenceUpdateRequest;
 import io.fleetcoreplatform.Models.OutpostGroupSummary;
 import io.fleetcoreplatform.Models.OutpostSummary;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -20,6 +21,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.jboss.logging.Logger;
 
 // TODO: Implement row-level authentication on outposts endpoint (#28)
@@ -110,10 +113,40 @@ public class OutpostsEndpoint {
 
             return Response.ok(outpost).build();
         } catch (IllegalArgumentException e) {
-            // Catches invalid UUID strings
             return Response.status(Response.Status.BAD_REQUEST).build();
         } catch (Exception e) {
             logger.error("Error while fetching outpost", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PUT
+    @Path("/{outpost-uuid}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response editOutpostGeofence(
+        @PathParam("outpost-uuid") UUID outpostUuid,
+        @RequestBody OutpostGeofenceUpdateRequest body
+    ) {
+        if (outpostUuid == null || body == null || body.area() == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+
+        try {
+
+            DbOutpost outpost = outpostMapper.findByUuidAndCoordinator(outpostUuid, cognitoSub);
+            if (outpost == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            outpostMapper.updateArea(outpostUuid, body.area());
+
+            return Response.noContent().build();
+
+        } catch (Exception e) {
+            logger.error(e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }

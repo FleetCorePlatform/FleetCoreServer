@@ -1,6 +1,7 @@
 package io.fleetcoreplatform.Endpoints;
 
 import io.fleetcoreplatform.Managers.Database.DbModels.DbCoordinator;
+import io.fleetcoreplatform.Managers.Database.DbModels.DbMission;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
 import io.fleetcoreplatform.Managers.SQS.SqsManager;
@@ -39,12 +40,16 @@ public class MissionsEndpoint {
     @RateLimit(value = 2, window = 10, windowUnit = ChronoUnit.MINUTES)
     public Response startOutpostSurvey(CreateMissionRequestModel body) {
         if (body == null
-                || body.outpost() == null
-                || body.groupUUID() == null) {
+                || body.outpostUuid() == null
+                || body.groupUuid() == null
+                || body.jobName() == null
+                || body.jobName().length() > 64) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
-        DbCoordinator coordinator = coordinatorMapper.findByCognitoSub(identity.getAttribute("sub"));
+        String cognitoSub = identity.getPrincipal().getName();
+
+        DbCoordinator coordinator = coordinatorMapper.findByCognitoSub(cognitoSub);
         if (coordinator == null) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
@@ -52,10 +57,11 @@ public class MissionsEndpoint {
         try {
             UUID missionUUID =
                     coreService.createNewMission(
-                            body.outpost(),
-                            body.groupUUID(),
+                            body.outpostUuid(),
+                            body.groupUuid(),
                             coordinator.getUuid(),
-                            body.altitude());
+                            body.altitude(),
+                            body.jobName());
 
             return Response.ok(new MissionCreatedResponseModel(missionUUID)).build();
         } catch (NotFoundException nfe) {
@@ -74,9 +80,38 @@ public class MissionsEndpoint {
     @Path("/{mission_uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response cancelMission(@PathParam("mission_uuid") UUID missionUUID, @RequestBody CancelMissionBodyModel body) {
-        // TODO: Implement mission cancel logic (#17)
-        return Response.status(Response.Status.NOT_IMPLEMENTED).build();
+    public Response cancelMission(
+            @PathParam("mission_uuid") UUID missionUUID,
+            CancelMissionBodyModel body) {
+
+        if (body == null || body.status() != CancelMissionBodyModel.MissionBodyEnum.CANCELLED) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Body must contain status: 'CANCELLED'")
+                    .build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+
+        try {
+            MissionCancellationContext context = missionMapper.findCancellationContext(missionUUID, cognitoSub);
+            if (context == null) {
+                throw new NotFoundException("Mission not found or access denied");
+            }
+
+            coreService.cancelJob(
+                context.outpostUuid(),
+                context.groupUuid(),
+                context.missionUuid()
+            );
+
+            return Response.noContent().build();
+
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        } catch (Exception e) {
+            logger.errorf("Error cancelling mission %s: %s", missionUUID, e.getMessage());
+            return Response.serverError().entity("Internal Server Error").build();
+        }
     }
 
     @GET

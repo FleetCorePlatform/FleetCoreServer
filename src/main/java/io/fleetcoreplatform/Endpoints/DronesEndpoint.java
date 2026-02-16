@@ -2,6 +2,8 @@ package io.fleetcoreplatform.Endpoints;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.fleetcoreplatform.Exceptions.GroupHasNoOutpostException;
+import io.fleetcoreplatform.Exceptions.KinesisCannotCreateChannelException;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbDrone;
 import io.fleetcoreplatform.Managers.Database.Mappers.DroneMapper;
 import io.fleetcoreplatform.Managers.IoTCore.IotDataPlaneManager;
@@ -132,7 +134,7 @@ public class DronesEndpoint {
         }
 
         try {
-            IoTCertContainer certs =
+            RegisteredDroneResponse certs =
                     coreService.registerNewDrone(
                             body.groupName(),
                             body.droneName(),
@@ -146,6 +148,12 @@ public class DronesEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND.getStatusCode(), nfe.getMessage())
                     .build();
+        } catch (GroupHasNoOutpostException noe) {
+            logger.severe(noe.getMessage());
+            return Response.status(422).entity(noe).build();
+        } catch (KinesisCannotCreateChannelException kce) {
+            logger.severe(kce.getMessage());
+            return Response.notModified().build();
         } catch (Exception e) {
             logger.severe(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
