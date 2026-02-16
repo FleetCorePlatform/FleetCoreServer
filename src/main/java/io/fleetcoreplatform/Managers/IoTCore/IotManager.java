@@ -175,11 +175,19 @@ public class IotManager {
         future.join();
     }
 
-    public void createThing(String thingName) {
+    public void createThing(String thingName, String outpost, String group) {
+        AttributePayload attributePayload = AttributePayload.builder()
+            .attributes(Map.of(
+                "outpost", outpost,
+                "group", group
+            ))
+            .build();
+
         CreateThingRequest createThingRequest =
                 CreateThingRequest.builder()
                         .thingName(thingName)
                         .thingTypeName(config.iot().thingType())
+                        .attributePayload(attributePayload)
                         .build();
 
         CompletableFuture<CreateThingResponse> future =
@@ -481,6 +489,36 @@ public class IotManager {
                 });
 
         future.join();
+    }
+
+    public Map<String, String> getGroupAttributes(String groupName) {
+        DescribeThingGroupRequest thingRequest =
+                DescribeThingGroupRequest.builder().thingGroupName(groupName).build();
+
+        try {
+            CompletableFuture<DescribeThingGroupResponse> future =
+                    iotAsyncClient.describeThingGroup(thingRequest);
+
+            DescribeThingGroupResponse describeResponse = future.join();
+
+            var attributes = describeResponse.thingGroupProperties().attributePayload().attributes();
+
+            if (attributes != null && !attributes.isEmpty()) {
+                return attributes;
+            } else {
+                return null;
+            }
+
+        } catch (Exception ex) {
+            if (ex instanceof IotException) {
+                System.err.println(
+                        ((IotException) ex).awsErrorDetails().errorMessage());
+            } else {
+                System.err.println("Unexpected error: " + ex.getMessage());
+            }
+
+            return null;
+        }
     }
 
     public DroneStatusModel getDroneStatus(String deviceName) {

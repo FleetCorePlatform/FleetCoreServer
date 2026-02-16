@@ -8,13 +8,15 @@ public class IotDocumentBuilder {
                 """
             {
               "operation": "${action}",
-              "mission_uuid": "${missionName}",
-              "download_url": "${downloadUrl}",
-              "download_path": "${filePath}",
-              "metadata": {
-                "outpost": "${outpost}",
-                "group": "${group}",
-                "bucket": "${bucket}"
+              "data": {
+                "mission_uuid": "${missionName}",
+                "download_url": "${downloadUrl}",
+                "download_path": "${filePath}",
+                "metadata": {
+                  "outpost": "${outpost}",
+                  "group": "${group}",
+                  "bucket": "${bucket}"
+                }
               }
             }
             """;

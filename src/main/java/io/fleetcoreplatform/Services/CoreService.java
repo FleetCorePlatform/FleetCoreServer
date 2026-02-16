@@ -1,7 +1,10 @@
 package io.fleetcoreplatform.Services;
 
 import io.fleetcoreplatform.Configs.ApplicationConfig;
+import io.fleetcoreplatform.Exceptions.GroupHasNoOutpostException;
+import io.fleetcoreplatform.Exceptions.KinesisCannotCreateChannelException;
 import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
+import io.fleetcoreplatform.Managers.Kinesis.KinesisVideoManager;
 import io.fleetcoreplatform.Models.DroneIdentity;
 import io.fleetcoreplatform.Exceptions.GroupNotEmptyException;
 import io.fleetcoreplatform.Managers.Cognito.CognitoManager;
@@ -24,6 +27,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.jboss.logging.Logger;
 import org.postgis.Geometry;
+import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.awssdk.services.iot.model.Job;
 import software.amazon.awssdk.services.iot.model.JobExecutionSummary;
 
@@ -40,6 +44,7 @@ public class CoreService {
     @Inject OutpostMapper outpostMapper;
     @Inject MissionMapper missionMapper;
     @Inject CoordinatorMapper coordinatorMapper;
+    @Inject KinesisVideoManager kinesisVideoManager;
     @Inject Logger logger;
 
     /**
@@ -50,7 +55,7 @@ public class CoreService {
      * @param address Public IP address of the drone
      * @param agentVersion Version of the OnboardAgent client
      */
-    public IoTCertContainer registerNewDrone(
+    public RegisteredDroneResponse registerNewDrone(
             String group,
             String droneName,
             String address,
@@ -58,7 +63,7 @@ public class CoreService {
             DroneHomePositionModel homePosition,
             String model,
             List<String> capabilities)
-            throws NotFoundException {
+            throws NotFoundException, GroupHasNoOutpostException {
         DbGroup dbGroup = groupMapper.findByName(group);
 
         if (dbGroup == null) {
@@ -66,25 +71,39 @@ public class CoreService {
         }
 
         UUID uuid = UUID.randomUUID();
-        String thingName = uuid.toString();
+        String thingNameUuid = uuid.toString();
+
+        var attributes = iotManager.getGroupAttributes(group);
+
+        if (attributes == null || attributes.get("outpost") == null) {
+            throw new GroupHasNoOutpostException("Target group has no outpost attribute");
+        }
+
+        var createdCheck = kinesisVideoManager.createSignalingChannel(uuid);
+        if (createdCheck == null) {
+            throw new KinesisCannotCreateChannelException("Cannot create kinesis video signaling channel for drone");
+        }
 
         IoTCertContainer certContainer = iotManager.generateCertificate();
-        iotManager.createThing(thingName);
+        iotManager.createThing(thingNameUuid, attributes.get("outpost"), group);
 
-        String policyName = iotManager.createPolicy(thingName);
-        iotManager.attachPolicyToCertificate(certContainer.getCertificateARN(), policyName);
+        String policyName = iotManager.createPolicy(thingNameUuid);
+        iotManager.attachPolicyToCertificate(certContainer.certificateARN(), policyName);
 
-        iotManager.attachCertificate(thingName, certContainer.getCertificateARN());
+        iotManager.attachCertificate(thingNameUuid, certContainer.certificateARN());
 
         String groupARN = iotManager.getGroupARN(group);
-        iotManager.addDeviceToGroup(thingName, groupARN);
+        iotManager.addDeviceToGroup(thingNameUuid, groupARN);
+
 
         UUID groupUUID = dbGroup.getUuid();
         Timestamp addedDate = new Timestamp(System.currentTimeMillis());
-        droneMapper.insertDrone(
-                uuid, droneName, groupUUID, address, agentVersion, addedDate, homePosition, model, capabilities);
 
-        return certContainer;
+        // Signaling channel name (UUID) is same as the thing name (UUID) so the drone know to access its "own" signaling channel
+        droneMapper.insertDrone(
+                uuid, droneName, groupUUID, address, agentVersion, addedDate, homePosition, model, capabilities, uuid);
+
+        return new RegisteredDroneResponse(thingNameUuid, certContainer);
     }
 
     public void updateDrone(UUID droneUuid, DroneRequestModel data) throws NotFoundException {
@@ -172,6 +191,8 @@ public class CoreService {
 
         iotManager.removeThing(thingName);
         droneMapper.deleteDrone(droneUuid);
+
+        kinesisVideoManager.deleteSignalingChannel(droneUuid);
     }
 
     public void removeDroneFromGroup(UUID droneUUID) throws NotFoundException {
@@ -293,20 +314,26 @@ public class CoreService {
     /**
      * Coordinates multiple managers to create an IoT Core mission for a group of drones
      *
-     * @param outpost The name of the outpost the groups is in
-     * @param groupUUID Name of the group of drones
+     * @param outpostUuid The UUID of the outpost the groups is in
+     * @param groupUUID UUID of the group
      * @param coordinatorUUID The UUID of the coordinator performing this operation
      * @throws IOException If there was an error generating the mission bundle
      * @throws NotFoundException If the outpost, or group doesn't exist
      */
     public UUID createNewMission(
-            String outpost, UUID groupUUID, UUID coordinatorUUID, Integer altitude)
+            UUID outpostUuid, UUID groupUUID, UUID coordinatorUUID, Integer altitude, String jobName)
             throws IOException, NotFoundException {
-
         DbGroup dbgroup = groupMapper.findByUuid(groupUUID);
         if (dbgroup == null) {
             throw new NotFoundException("Group not found with UUID " + groupUUID.toString());
         }
+
+        DbOutpost dbOutpost = outpostMapper.findByUuid(outpostUuid);
+        if (dbOutpost == null) {
+            throw new NotFoundException("Outpost cannot be found with name " + outpostUuid);
+        }
+
+        UUID missionUuid = UUID.randomUUID();
 
         String group = dbgroup.getName();
 
@@ -317,12 +344,9 @@ public class CoreService {
                         .toLocalDateTime()
                         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS"));
 
-        String missionPath = "missions/" + outpost + "/" + group + "/mission-" + s3Timestamp;
+        String missionPath = "missions/" + outpostUuid + "/" + group + "/mission-" + s3Timestamp;
 
-        DbOutpost dbOutpost = outpostMapper.findByName(outpost);
-        if (dbOutpost == null) {
-            throw new NotFoundException("Outpost cannot be found with name " + outpost);
-        }
+        String outpostName = dbOutpost.getName();
 
         Geometry area = dbOutpost.getArea().toGeometry();
 
@@ -351,7 +375,7 @@ public class CoreService {
 
         String groupARN = iotManager.getGroupARN(group);
 
-        String iotMissionName = outpost + "-" + group + "_" + s3Timestamp;
+        String iotMissionName = missionUuid.toString();
 
         // Create 'Download-File' mission -> download mission file from url and execute mission from
         // it
@@ -361,17 +385,44 @@ public class CoreService {
                 iotMissionName,
                 downloadUrl,
                 "/tmp/missions/",
-                outpost,
+                outpostName,
                 group,
                 config.s3().bucketName());
 
         String bundleUrl = storageManager.getInternalObjectUrl(key);
 
-        UUID missionUuid = UUID.randomUUID();
         missionMapper.insert(
-                missionUuid, groupUUID, iotMissionName, bundleUrl, startedAt, coordinatorUUID);
+                missionUuid, groupUUID, jobName, bundleUrl, startedAt, coordinatorUUID);
 
         return missionUuid;
+    }
+
+    public void cancelJob(UUID outpostUuid, UUID groupUUID, UUID jobToCancelUuid) {
+        DbGroup dbgroup = groupMapper.findByUuid(groupUUID);
+        if (dbgroup == null) {
+            throw new NotFoundException("Group not found with UUID " + groupUUID.toString());
+        }
+
+        DbOutpost dbOutpost = outpostMapper.findByUuid(outpostUuid);
+        if (dbOutpost == null) {
+            throw new NotFoundException("Outpost cannot be found with name " + outpostUuid);
+        }
+
+        String group = dbgroup.getName();
+        String groupARN = iotManager.getGroupARN(group);
+        String outpostName = dbOutpost.getName();
+
+        String iotMissionName = String.format("%s-canceljob", jobToCancelUuid.toString());
+
+        iotManager.createIoTJob(
+                groupARN,
+                MissionDocumentEnums.CANCEL,
+                iotMissionName,
+                "",
+                "",
+                outpostName,
+                group,
+                "");
     }
 
     private static ArrayList<DroneIdentity> getDroneIdentities(
@@ -424,7 +475,7 @@ public class CoreService {
             throw new NotFoundException("Mission not found with UUID " + missionUuid.toString());
         }
 
-        Job job = iotManager.getJob(mission.getName());
+        Job job = iotManager.getJob(mission.getUuid().toString());
 
         return new MissionExecutionStatusModel(job.status(), mission.getStart_time(), job.completedAt() != null ? Timestamp.from(job.completedAt()) : null);
     }
