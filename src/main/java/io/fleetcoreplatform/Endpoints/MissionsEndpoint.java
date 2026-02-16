@@ -116,11 +116,36 @@ public class MissionsEndpoint {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllMissionSummaries(@QueryParam("group_uuid") UUID groupUuid) {
+    public Response getAllMissionSummariesForGroup(@QueryParam("group_uuid") UUID groupUuid) {
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
             List<MissionSummary> missions = missionMapper.selectMissionSummariesByGroupAndCoordinator(groupUuid, cognitoSub);
+            if (missions == null) {
+                return Response.status(Response.Status.NO_CONTENT).build();
+            }
+
+            return Response.ok(missions).build();
+
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        } catch (Exception e) {
+            logger.error(e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getAllMissionSummariesForCoordinator(@QueryParam("count") Integer count) {
+        if (count == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+
+        try {
+            List<MissionSummary> missions = missionMapper.selectLatestMissionSummariesByCoordinator(cognitoSub, count);
             if (missions == null) {
                 return Response.status(Response.Status.NO_CONTENT).build();
             }

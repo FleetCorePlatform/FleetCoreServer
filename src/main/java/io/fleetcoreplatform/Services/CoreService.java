@@ -350,7 +350,7 @@ public class CoreService {
 
         Geometry area = dbOutpost.getArea().toGeometry();
 
-        List<DbDrone> drones = droneMapper.listDronesByGroupUuid(groupUUID, 100);
+        List<DbDrone> drones = droneMapper.listNoMaintenanceDronesByGroupUuid(groupUUID, 100);
         ArrayList<DroneIdentity> droneIdentities = getDroneIdentities(groupUUID, drones);
 
         int missionAltitude =
