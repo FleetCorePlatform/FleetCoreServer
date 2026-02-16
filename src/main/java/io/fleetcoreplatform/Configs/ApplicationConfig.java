@@ -8,9 +8,6 @@ public interface ApplicationConfig {
     @WithName("region")
     String region();
 
-    @WithName("sqs")
-    SQSConfig sqs();
-
     @WithName("s3")
     S3Config s3();
 
@@ -19,6 +16,12 @@ public interface ApplicationConfig {
 
     @WithName("cognito")
     CognitoConfig cognito();
+
+    @WithName("sqs")
+    SQSConfig sqs();
+
+    @WithName("kinesis")
+    KinesisConfig kinesis();
 
     interface S3Config {
         @WithName("bucket-name")
@@ -50,5 +53,10 @@ public interface ApplicationConfig {
     interface SQSConfig {
         @WithName("queue-name")
         String queueName();
+    }
+
+    interface KinesisConfig {
+        @WithName("region")
+        String region();
     }
 }
