@@ -16,6 +16,7 @@ public interface DetectionsMapper {
         INNER JOIN outposts o ON g.outpost_uuid = o.uuid
         INNER JOIN coordinators c ON o.created_by = c.uuid
         WHERE d.uuid = #{uuid, jdbcType=OTHER}
+          AND d.mission_uuid = #{missionUuid, jdbcType=OTHER}
           AND c.cognito_sub = #{cognitoSub}
     """)
     @Results(value = {
@@ -31,6 +32,7 @@ public interface DetectionsMapper {
     })
     DbDetection findByUuidAndCoordinator(
             @Param("uuid") UUID uuid,
+            @Param("missionUuid") UUID missionUuid,
             @Param("cognitoSub") String cognitoSub);
 
     @Select("""

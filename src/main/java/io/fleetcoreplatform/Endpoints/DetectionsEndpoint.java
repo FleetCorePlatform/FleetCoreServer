@@ -57,7 +57,7 @@ public class DetectionsEndpoint {
         try {
             String cognitoSub = identity.getPrincipal().getName();
 
-            DbDetection detection = detectionsMapper.findByUuidAndCoordinator(missionUuid, cognitoSub);
+            DbDetection detection = detectionsMapper.findByUuidAndCoordinator(detectionUuid, missionUuid, cognitoSub);
             if (detection == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
