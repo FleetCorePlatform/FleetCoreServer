@@ -70,6 +70,23 @@ public interface DroneMapper {
             @Param("groupUuid") UUID groupUuid, @Param("limit") int limit);
 
     @Select(
+           "SELECT uuid, name, group_uuid, address, manager_version, first_discovered,"
+                + " home_position, model, capabilities "
+                + "FROM drones "
+                + "WHERE group_uuid = #{groupUuid, jdbcType=OTHER} "
+                + "AND NOT EXISTS (SELECT 1 FROM drone_maintenance dm WHERE dm.drone_uuid = drones.uuid) "
+                + "LIMIT ${limit}")
+    @Results({
+        @Result(
+                property = "home_position",
+                column = "home_position",
+                typeHandler = GeometryTypeHandler.class),
+        @Result(property = "capabilities", column = "capabilities", typeHandler = StringArrayTypeHandler.class)
+    })
+    List<DbDrone> listNoMaintenanceDronesByGroupUuid(
+            @Param("groupUuid") UUID groupUuid, @Param("limit") int limit);
+
+    @Select(
             """
         SELECT d.uuid, d.name, d.group_uuid, d.address, d.manager_version, d.first_discovered, d.home_position, d.model, d.capabilities
         FROM drones d
