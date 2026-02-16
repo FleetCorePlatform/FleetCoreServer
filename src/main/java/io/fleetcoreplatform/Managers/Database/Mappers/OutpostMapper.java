@@ -62,7 +62,7 @@ public interface OutpostMapper {
     DbOutpost findByName(@Param("name") String name);
 
     @Delete("DELETE FROM outposts WHERE uuid = #{uuid, jdbcType=OTHER}")
-    void delete(@Param("uuid") UUID uuid);
+    int delete(@Param("uuid") UUID uuid);
 
     @Select("""
         SELECT
@@ -86,6 +86,17 @@ public interface OutpostMapper {
         @Param("outpostUuid") UUID outpostUuid,
         @Param("cognitoSub") String cognitoSub
     );
+
+    @Select(
+            """
+        SELECT COUNT(*)
+        FROM drones d
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        WHERE o.uuid = #{outpostUuid, jdbcType=OTHER}
+    """)
+    int getDroneCountInOutpost(
+            @Param("outpostUuid") UUID outpostUuid);
 
     @Update(
         "UPDATE outposts SET area = ST_GeomFromText(#{area}, 4326) WHERE uuid = #{uuid, jdbcType=OTHER}"

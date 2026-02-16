@@ -1,5 +1,6 @@
 package io.fleetcoreplatform.Endpoints;
 
+import io.fleetcoreplatform.Exceptions.OutpostNotEmptyException;
 import io.fleetcoreplatform.Managers.Database.DbModels.DbOutpost;
 import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
@@ -7,6 +8,7 @@ import io.fleetcoreplatform.Models.CreateOutpostModel;
 import io.fleetcoreplatform.Models.OutpostGeofenceUpdateRequest;
 import io.fleetcoreplatform.Models.OutpostGroupSummary;
 import io.fleetcoreplatform.Models.OutpostSummary;
+import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.inject.Inject;
@@ -34,6 +36,7 @@ public class OutpostsEndpoint {
     @Inject CoordinatorMapper coordinatorMapper;
     @Inject SecurityIdentity identity;
     @Inject Logger logger;
+    @Inject CoreService coreService;
 
     // TODO: Implement OutpostsEndpoint (#24)
     @POST
@@ -167,6 +170,29 @@ public class OutpostsEndpoint {
             OutpostSummary summary = new OutpostSummary(outpost.getName(), outpost.getUuid(), outpost.getLatitude(), outpost.getLongitude(), outpost.getCreated_at(), groupSummaries, outpost.getArea());
 
             return Response.ok(summary).build();
+        } catch (Exception e) {
+            logger.error("Error fetching outpost summary", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DELETE
+    @Path("/{outpost-uuid}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response tryDeleteOutpost(@PathParam("outpost-uuid") UUID outpostUUID) {
+        try {
+            String cognitoSub = identity.getPrincipal().getName();
+
+            DbOutpost outpost = outpostMapper.findByUuidAndCoordinator(outpostUUID, cognitoSub);
+            if (outpost == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            coreService.deleteOutpost(outpostUUID);
+
+            return Response.noContent().build();
+        } catch (OutpostNotEmptyException one) {
+            return Response.notModified(one.getMessage()).build();
         } catch (Exception e) {
             logger.error("Error fetching outpost summary", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();

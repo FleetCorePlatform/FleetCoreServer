@@ -3,6 +3,7 @@ package io.fleetcoreplatform.Services;
 import io.fleetcoreplatform.Configs.ApplicationConfig;
 import io.fleetcoreplatform.Exceptions.GroupHasNoOutpostException;
 import io.fleetcoreplatform.Exceptions.KinesisCannotCreateChannelException;
+import io.fleetcoreplatform.Exceptions.OutpostNotEmptyException;
 import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
 import io.fleetcoreplatform.Managers.Kinesis.KinesisVideoManager;
 import io.fleetcoreplatform.Models.DroneIdentity;
@@ -478,5 +479,18 @@ public class CoreService {
         Job job = iotManager.getJob(mission.getUuid().toString());
 
         return new MissionExecutionStatusModel(job.status(), mission.getStart_time(), job.completedAt() != null ? Timestamp.from(job.completedAt()) : null);
+    }
+
+    public void deleteOutpost(UUID outpostUuid)
+        throws OutpostNotEmptyException{
+        int count = outpostMapper.getDroneCountInOutpost(outpostUuid);
+        if (count > 0) {
+            throw new OutpostNotEmptyException("Outpost is not empty");
+        }
+
+        int rowsAffected = outpostMapper.delete(outpostUuid);
+        if (rowsAffected == 0) {
+            logger.error(String.format("Error while deleting outpost %s", outpostUuid.toString()));
+        }
     }
 }
