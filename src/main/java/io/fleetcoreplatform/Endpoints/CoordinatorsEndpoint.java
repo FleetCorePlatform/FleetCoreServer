@@ -13,11 +13,22 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/coordinators")
 //@RolesAllowed("${allowed.superadmin.role-name}")
+@Tag(name = "Coordinators", description = "Operations related to coordinator management")
 public class CoordinatorsEndpoint {
 
     @Inject
@@ -30,7 +41,14 @@ public class CoordinatorsEndpoint {
     @Path("/{coordinator_uuid}")
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
+    @Operation(summary = "Get coordinator", description = "Get details of a specific coordinator")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(implementation = DbCoordinator.class))),
+        @APIResponse(responseCode = "404", description = "Coordinator not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
     public Response getCoordinator(
+        @Parameter(description = "UUID of the coordinator", required = true)
         @PathParam("coordinator_uuid") UUID coordinator_uuid
     ) {
         try {
@@ -54,7 +72,14 @@ public class CoordinatorsEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @RateLimit(value = 2, window = 1, windowUnit = ChronoUnit.HOURS)
+    @Operation(summary = "Register coordinator", description = "Register a new coordinator")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Coordinator registered successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = String.class, description = "Temporary password"))),
+        @APIResponse(responseCode = "400", description = "Invalid request body"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
     public Response registerCoordinator(
+        @RequestBody(description = "Coordinator registration details", required = true)
         CoordinatorRequestModel coordinatorRequestModel
     ) {
         if (
@@ -93,8 +118,17 @@ public class CoordinatorsEndpoint {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 10, window = 5, windowUnit = ChronoUnit.SECONDS)
+    @Operation(summary = "Update coordinator", description = "Update details of an existing coordinator")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "204", description = "Coordinator updated successfully"),
+        @APIResponse(responseCode = "400", description = "Invalid request body"),
+        @APIResponse(responseCode = "404", description = "Coordinator not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
     public Response updateCoordinator(
+        @Parameter(description = "UUID of the coordinator", required = true)
         @PathParam("coordinator_uuid") UUID coordinator_uuid,
+        @RequestBody(description = "Update details", required = true)
         UpdateCoordinatorModel body
     ) {
         if (
