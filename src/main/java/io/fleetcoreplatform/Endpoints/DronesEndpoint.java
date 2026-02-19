@@ -350,7 +350,7 @@ public class DronesEndpoint {
 
         try {
             String jsonString = mapper.writeValueAsString(body);
-            iotPublisher.publish("devices/" + droneUuid.toString() + "/stream", jsonString, 1);
+            iotPublisher.publish("devices/" + droneUuid.toString() + "/stream", jsonString, 0);
 
             return Response.noContent().build();
         } catch (JsonProcessingException e) {
