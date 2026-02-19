@@ -12,13 +12,23 @@ import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.jboss.logging.Logger;
 
 import java.util.List;
 import java.util.UUID;
 
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+
 @Path("/api/v1/detections")
+@Tag(name = "Detections", description = "Operations related to drone detections")
 public class DetectionsEndpoint {
     @Inject DetectionsMapper detectionsMapper;
     @Inject MissionMapper missionMapper;
@@ -26,7 +36,18 @@ public class DetectionsEndpoint {
     @Inject Logger logger;
 
     @GET
-    public Response getDetections(@QueryParam("group_uuid") UUID groupUuid, @QueryParam("mission_uuid") UUID missionUuid) {
+    @Operation(summary = "Get detections", description = "List detections for a mission and group")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(type = SchemaType.ARRAY, implementation = DbDetection.class))),
+        @APIResponse(responseCode = "400", description = "Bad request"),
+        @APIResponse(responseCode = "404", description = "Mission not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response getDetections(
+            @Parameter(description = "UUID of the group", required = true)
+            @QueryParam("group_uuid") UUID groupUuid,
+            @Parameter(description = "UUID of the mission", required = true)
+            @QueryParam("mission_uuid") UUID missionUuid) {
         if (missionUuid == null || groupUuid == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
@@ -49,7 +70,21 @@ public class DetectionsEndpoint {
     }
 
     @PATCH
-    public Response validateDetection(@QueryParam("mission_uuid") UUID missionUuid, @QueryParam("detection_uuid") UUID detectionUuid, @RequestBody DetectionValidationRequestModel body) {
+    @Operation(summary = "Validate detection", description = "Mark a detection as valid or false positive")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "204", description = "Detection validated successfully"),
+        @APIResponse(responseCode = "304", description = "Not modified"),
+        @APIResponse(responseCode = "400", description = "Bad request"),
+        @APIResponse(responseCode = "404", description = "Detection not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response validateDetection(
+            @Parameter(description = "UUID of the mission", required = true)
+            @QueryParam("mission_uuid") UUID missionUuid,
+            @Parameter(description = "UUID of the detection", required = true)
+            @QueryParam("detection_uuid") UUID detectionUuid,
+            @RequestBody(description = "Validation details", required = true)
+            DetectionValidationRequestModel body) {
         if (missionUuid == null || detectionUuid == null || body == null || body.false_positive() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
