@@ -19,8 +19,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+
 @NoCache
 @Path("/api/v1/maintenance")
+@Tag(name = "Maintenance", description = "Operations related to drone maintenance")
 public class MaintenanceEndpoint {
     @Inject SecurityIdentity identity;
     @Inject Logger logger;
@@ -29,7 +40,16 @@ public class MaintenanceEndpoint {
     @Inject CoordinatorMapper coordinatorMapper;
 
     @GET
-    public Response getMaintenances(@QueryParam("outpost_uuid") UUID outpost_uuid) {
+    @Operation(summary = "Get maintenances", description = "List maintenance records for an outpost")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(type = SchemaType.ARRAY, implementation = MaintenanceSummary.class))),
+        @APIResponse(responseCode = "400", description = "Bad request"),
+        @APIResponse(responseCode = "404", description = "Not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response getMaintenances(
+            @Parameter(description = "UUID of the outpost", required = true)
+            @QueryParam("outpost_uuid") UUID outpost_uuid) {
         if (outpost_uuid == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
@@ -52,7 +72,16 @@ public class MaintenanceEndpoint {
     }
 
     @POST
-    public Response scheduleMaintenance(MaintenanceCreateRequestModel request) {
+    @Operation(summary = "Schedule maintenance", description = "Schedule a new maintenance for a drone")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "204", description = "Maintenance scheduled successfully"),
+        @APIResponse(responseCode = "400", description = "Invalid request body"),
+        @APIResponse(responseCode = "404", description = "Drone not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response scheduleMaintenance(
+            @RequestBody(description = "Maintenance schedule details", required = true)
+            MaintenanceCreateRequestModel request) {
         if (request.droneUuid() == null || request.type() == null || request.description() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
@@ -75,7 +104,16 @@ public class MaintenanceEndpoint {
 
     @PATCH
     @Path("/{maintenance_uuid}")
-    public Response completeMaintenance(@PathParam("maintenance_uuid") UUID maintenanceUuid) {
+    @Operation(summary = "Complete maintenance", description = "Mark a maintenance record as complete")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Maintenance completed successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = DbDroneMaintenance.class))),
+        @APIResponse(responseCode = "404", description = "Maintenance not found"),
+        @APIResponse(responseCode = "409", description = "Maintenance already completed"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response completeMaintenance(
+            @Parameter(description = "UUID of the maintenance record", required = true)
+            @PathParam("maintenance_uuid") UUID maintenanceUuid) {
         String cognitoSub = identity.getPrincipal().getName();
 
         DbDroneMaintenance maintenance = maintenanceMapper.findByUuidAndCoordinator(maintenanceUuid, cognitoSub);
@@ -104,7 +142,15 @@ public class MaintenanceEndpoint {
 
     @DELETE
     @Path("/{maintenance_uuid}")
-    public Response deleteMaintenance(@PathParam("maintenance_uuid") UUID maintenance_uuid) {
+    @Operation(summary = "Delete maintenance", description = "Delete a maintenance record")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "204", description = "Maintenance deleted successfully"),
+        @APIResponse(responseCode = "404", description = "Maintenance not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response deleteMaintenance(
+            @Parameter(description = "UUID of the maintenance record", required = true)
+            @PathParam("maintenance_uuid") UUID maintenance_uuid) {
         String cognitoSub = identity.getPrincipal().getName();
 
         DbDroneMaintenance record = maintenanceMapper.findByUuidAndCoordinator(maintenance_uuid, cognitoSub);
