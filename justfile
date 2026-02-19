@@ -5,7 +5,7 @@ project := "fleetcore"
 image := "fleetcoreserver"
 tag := "latest"
 
-default: clean format run
+default: clean format dev
 
 clean:
     rm -rf target
@@ -25,7 +25,7 @@ lint:
 test:
     ./mvnw test
 
-run:
+dev:
     ./mvnw quarkus:dev
 
 # Usage: just build (jvm|native)
