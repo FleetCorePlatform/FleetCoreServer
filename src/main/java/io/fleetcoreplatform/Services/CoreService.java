@@ -236,26 +236,24 @@ public class CoreService {
             throw new NotFoundException("Outpost not found with UUID " + outpostUuid.toString());
         }
 
-        String outpostName = dbOutpost.getName();
-
         Timestamp createdDate = new Timestamp(System.currentTimeMillis());
 
-        iotManager.createThingGroup(groupName, outpostName);
+        iotManager.createThingGroup(groupUUID.toString(), outpostUuid.toString());
         groupMapper.insert(groupUUID, dbOutpost.getUuid(), groupName, createdDate);
     }
 
-    public void tryDeleteGroup(String groupName) throws GroupNotEmptyException {
-        DbGroup group = groupMapper.findByName(groupName);
+    public void tryDeleteGroup(UUID groupUuid) throws GroupNotEmptyException {
+        DbGroup group = groupMapper.findByUuid(groupUuid);
         if (group == null) {
-            throw new NotFoundException("Group not found with name " + groupName);
+            throw new NotFoundException("Group not found with UUID " + groupUuid.toString());
         }
 
         if (!droneMapper.listDronesByGroupUuid(group.getUuid(), 1).isEmpty()) {
-            throw new GroupNotEmptyException("Group " + groupName + " is not empty");
+            throw new GroupNotEmptyException("Group " + group.getName() + " is not empty");
         }
         ;
-        iotManager.removeThingGroup(groupName);
-        groupMapper.deleteByName(groupName);
+        iotManager.removeThingGroup(group.getName());
+        groupMapper.deleteByUuid(groupUuid);
     }
 
     public void updateGroup(UUID groupUuid, UpdateGroupOutpostModel data) throws NotFoundException {

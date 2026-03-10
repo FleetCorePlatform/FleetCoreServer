@@ -216,7 +216,7 @@ public class GroupsEndpoint {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
-            coreService.tryDeleteGroup(group.getName());
+            coreService.tryDeleteGroup(group_uuid);
 
             return Response.status(Response.Status.NO_CONTENT).build();
         } catch (GroupNotEmptyException gne) {
