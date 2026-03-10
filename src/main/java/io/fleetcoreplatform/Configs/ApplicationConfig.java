@@ -35,12 +35,6 @@ public interface ApplicationConfig {
         @WithName("pubsub-client-id")
         String pubsubClientId();
 
-        @WithName("mission-cancel-job-arn")
-        String missionCancelJobArn();
-
-        @WithName("new-mission-job-arn")
-        String newMissionJobArn();
-
         @WithName("role-alias")
         String roleAlias();
     }
