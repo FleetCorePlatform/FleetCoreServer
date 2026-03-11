@@ -44,7 +44,7 @@ public class MissionsEndpoint {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 2, window = 10, windowUnit = ChronoUnit.MINUTES)
-    @Operation(summary = "Start outpost survey", description = "Create and start a new mission to survey an outpost")
+    @Operation(summary = "Create mission", description = "Create a full survey, subset survey, or solo manual mission")
     @APIResponses(value = {
         @APIResponse(responseCode = "200", description = "Mission created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = MissionCreatedResponseModel.class))),
         @APIResponse(responseCode = "400", description = "Invalid request body"),
@@ -52,42 +52,55 @@ public class MissionsEndpoint {
         @APIResponse(responseCode = "404", description = "Resource not found"),
         @APIResponse(responseCode = "500", description = "Internal server error")
     })
-    public Response startOutpostSurvey(
+    public Response createMission(
             @RequestBody(description = "Mission creation details", required = true)
             CreateMissionRequestModel body) {
-        if (body == null
-                || body.outpostUuid() == null
-                || body.groupUuid() == null
-                || body.jobName() == null
-                || body.jobName().length() > 64) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
+
+        if (body == null || body.jobName() == null || body.jobName().length() > 64) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Invalid basic parameters").build();
         }
 
         String cognitoSub = identity.getPrincipal().getName();
-
         DbCoordinator coordinator = coordinatorMapper.findByCognitoSub(cognitoSub);
         if (coordinator == null) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
         try {
-            UUID missionUUID =
-                    coreService.createNewMission(
-                            body.outpostUuid(),
-                            body.groupUuid(),
-                            coordinator.getUuid(),
-                            body.altitude(),
-                            body.jobName());
+            UUID missionUUID;
+            if (body.groupUuid() != null && body.outpostUuid() != null && body.waypoints() == null) {
+                missionUUID = coreService.createGroupMission(
+                        body.outpostUuid(),
+                        body.groupUuid(),
+                        body.droneUuids(),
+                        coordinator.getUuid(),
+                        body.altitude(),
+                        body.jobName());
+            }
+            else if (body.droneUuids() != null && body.droneUuids().size() == 1 && body.waypoints() != null) {
+                int speed = body.speed() != null ? body.speed() : 10;
+                missionUUID = coreService.createSoloMission(
+                        body.waypoints(),
+                        body.droneUuids().getFirst(),
+                        coordinator.getUuid(),
+                        body.altitude(),
+                        body.jobName(),
+                        speed);
+            }
+            else {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity("Payload must strictly define either a group survey or a solo manual mission.")
+                        .build();
+            }
 
             return Response.ok(new MissionCreatedResponseModel(missionUUID)).build();
-        } catch (NotFoundException nfe) {
-            return Response.status(Response.Status.NOT_FOUND).build();
-        } catch (IotException ioe) {
-            return Response.status(500, "Server internal error while bundling mission instructions")
-                    .build();
-        } catch (Exception e) {
-            logger.errorf("Unexpected error while starting outpost survey %s", e);
 
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND).entity(nfe.getMessage()).build();
+        } catch (IotException ioe) {
+            return Response.status(500, "Server internal error while bundling mission instructions").build();
+        } catch (Exception e) {
+            logger.errorf("Unexpected error while creating mission: %s", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -123,11 +136,7 @@ public class MissionsEndpoint {
                 throw new NotFoundException("Mission not found or access denied");
             }
 
-            coreService.cancelJob(
-                context.outpostUuid(),
-                context.groupUuid(),
-                context.missionUuid()
-            );
+            coreService.cancelJob(context);
 
             return Response.noContent().build();
 
@@ -268,6 +277,45 @@ public class MissionsEndpoint {
         } catch (NotFoundException nfe) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GET
+    @Path("/solo")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get solo mission summaries", description = "Get summaries of all solo missions for a specific outpost")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(type = SchemaType.ARRAY, implementation = SoloMissionSummary.class))),
+        @APIResponse(responseCode = "204", description = "No content"),
+        @APIResponse(responseCode = "400", description = "Bad request"),
+        @APIResponse(responseCode = "404", description = "Not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response getAllSoloMissionSummariesForOutpost(
+            @Parameter(description = "UUID of the outpost", required = true)
+            @QueryParam("outpost_uuid") UUID outpostUuid) {
+
+        if (outpostUuid == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Provide outpost_uuid")
+                    .build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+
+        try {
+            List<SoloMissionSummary> missions = missionMapper.selectSoloMissionSummariesByOutpostAndCoordinator(outpostUuid, cognitoSub);
+
+            if (missions == null || missions.isEmpty()) {
+                return Response.status(Response.Status.NO_CONTENT).build();
+            }
+            return Response.ok(missions).build();
+
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        } catch (Exception e) {
+            logger.error(e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
     }
