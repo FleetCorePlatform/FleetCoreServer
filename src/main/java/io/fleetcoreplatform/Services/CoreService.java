@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.jboss.logging.Logger;
 import org.postgis.Geometry;
+import org.postgis.Point;
 import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.awssdk.services.iot.model.Job;
 import software.amazon.awssdk.services.iot.model.JobExecutionSummary;
@@ -319,8 +320,8 @@ public class CoreService {
      * @throws IOException If there was an error generating the mission bundle
      * @throws NotFoundException If the outpost, or group doesn't exist
      */
-    public UUID createNewMission(
-            UUID outpostUuid, UUID groupUUID, UUID coordinatorUUID, Integer altitude, String jobName)
+    public UUID createGroupMission(
+            UUID outpostUuid, UUID groupUUID, List<UUID> droneUuids, UUID coordinatorUUID, Integer altitude, String jobName)
             throws IOException, NotFoundException {
         DbGroup dbgroup = groupMapper.findByUuid(groupUUID);
         if (dbgroup == null) {
@@ -349,8 +350,17 @@ public class CoreService {
 
         Geometry area = dbOutpost.getArea().toGeometry();
 
-        List<DbDrone> drones = droneMapper.listNoMaintenanceDronesByGroupUuid(groupUUID, 100);
-        ArrayList<DroneIdentity> droneIdentities = getDroneIdentities(groupUUID, drones);
+        List<DbDrone> allDrones = droneMapper.listNoMaintenanceDronesByGroupUuid(groupUUID, 100);
+
+        List<DbDrone> selectedDrones = (droneUuids == null || droneUuids.isEmpty())
+            ? allDrones
+            : allDrones.stream().filter(d -> droneUuids.contains(d.getUuid())).toList();
+
+        if (selectedDrones.isEmpty()) {
+            throw new NotFoundException("No available drones found for the specified selection.");
+        }
+
+        ArrayList<DroneIdentity> droneIdentities = getDroneIdentities(groupUUID, selectedDrones);
 
         int missionAltitude =
                 Objects.requireNonNullElseGet(
@@ -358,7 +368,7 @@ public class CoreService {
                         () ->
                                 Math.toIntExact(
                                         Math.round(
-                                                        drones.stream()
+                                                        selectedDrones.stream()
                                                                 .findFirst()
                                                                 .get()
                                                                 .getHome_position()
@@ -379,7 +389,7 @@ public class CoreService {
         // Create 'Download-File' mission -> download mission file from url and execute mission from
         // it
         iotManager.createIoTJob(
-                groupARN,
+                new GroupTarget(groupARN),
                 MissionDocumentEnums.DOWNLOAD,
                 iotMissionName,
                 downloadUrl,
@@ -396,35 +406,104 @@ public class CoreService {
         return missionUuid;
     }
 
-    public void cancelJob(UUID outpostUuid, UUID groupUUID, UUID jobToCancelUuid) {
-        DbGroup dbgroup = groupMapper.findByUuid(groupUUID);
-        if (dbgroup == null) {
-            throw new NotFoundException("Group not found with UUID " + groupUUID.toString());
+    public UUID createSoloMission(
+            Point[] waypoints, UUID droneUuid, UUID coordinatorUUID, Integer altitude, String jobName, int speed)
+            throws IOException, NotFoundException {
+        DbDrone dbDrone = droneMapper.findByUuid(droneUuid);
+        if (dbDrone == null) {
+            throw new NotFoundException("Drone not found with UUID " + droneUuid.toString());
         }
 
-        DbOutpost dbOutpost = outpostMapper.findByUuid(outpostUuid);
-        if (dbOutpost == null) {
-            throw new NotFoundException("Outpost cannot be found with name " + outpostUuid);
-        }
+        UUID missionUuid = UUID.randomUUID();
+        String thingName = dbDrone.getUuid().toString();
+        Timestamp startedAt = new Timestamp(System.currentTimeMillis());
 
-        String group = dbgroup.getName();
-        String groupARN = iotManager.getGroupARN(group);
-        String outpostName = dbOutpost.getName();
+        String s3Timestamp =
+                startedAt
+                        .toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS"));
 
-        String iotMissionName = String.format("%s-canceljob", jobToCancelUuid.toString());
+        String missionPath = "missions/solo/" + thingName + "/mission-" + s3Timestamp;
+
+        int missionAltitude = altitude != null ? altitude : Math.toIntExact(
+                Math.round(dbDrone.getHome_position().z()) + 25);
+
+        DroneIdentity droneIdentity = getDroneIdentity(droneUuid);
+
+        File missionBundle = MissionPlanner.buildManualMission(waypoints, droneIdentity, missionAltitude, speed);
+        String key = storageManager.uploadMissionBundle(missionPath, missionBundle);
+        String downloadUrl = storageManager.getPresignedObjectUrl(key, 30);
+        String droneARN = iotManager.getThingARN(thingName);
+        String iotMissionName = missionUuid.toString();
+
+        DbGroup dbGroup = groupMapper.findByUuid(dbDrone.getGroup_uuid());
+        DbOutpost dbOutpost = outpostMapper.findByUuid(dbGroup.getOutpost_uuid());
 
         iotManager.createIoTJob(
-                groupARN,
-                MissionDocumentEnums.CANCEL,
+                new DroneTarget(droneARN),
+                MissionDocumentEnums.DOWNLOAD,
                 iotMissionName,
-                "",
-                "",
-                outpostName,
-                group,
-                "");
+                downloadUrl,
+                "/tmp/missions/",
+                dbOutpost.getName(),
+                config.s3().bucketName()
+        );
+
+        String bundleUrl = storageManager.getInternalObjectUrl(key);
+
+        missionMapper.insert(
+                missionUuid, null, jobName, bundleUrl, startedAt, coordinatorUUID);
+
+        return missionUuid;
     }
 
-    private static ArrayList<DroneIdentity> getDroneIdentities(
+    public void cancelJob(MissionCancellationContext context) {
+        DbOutpost dbOutpost = outpostMapper.findByUuid(context.outpostUuid());
+        if (dbOutpost == null) {
+            throw new NotFoundException("Outpost cannot be found with UUID " + context.outpostUuid());
+        }
+
+        String outpostName = dbOutpost.getName();
+        String iotMissionName = String.format("%s-canceljob", context.missionUuid().toString());
+
+        if (context.droneUuid() != null) {
+            DbDrone dbDrone = droneMapper.findByUuid(context.droneUuid());
+            if (dbDrone == null) {
+                throw new NotFoundException("Drone not found with UUID " + context.droneUuid());
+            }
+            String droneARN = iotManager.getThingARN(dbDrone.getUuid().toString());
+
+            iotManager.createIoTJob(
+                    new DroneTarget(droneARN),
+                    MissionDocumentEnums.CANCEL,
+                    iotMissionName,
+                    "",
+                    "",
+                    outpostName,
+                    "");
+        } else if (context.groupUuid() != null) {
+            DbGroup dbgroup = groupMapper.findByUuid(context.groupUuid());
+            if (dbgroup == null) {
+                throw new NotFoundException("Group not found with UUID " + context.groupUuid());
+            }
+            String group = dbgroup.getName();
+            String groupARN = iotManager.getGroupARN(group);
+
+            iotManager.createIoTJob(
+                    new GroupTarget(groupARN),
+                    MissionDocumentEnums.CANCEL,
+                    iotMissionName,
+                    "",
+                    "",
+                    outpostName,
+                    group,
+                    "");
+        } else {
+            throw new IllegalStateException("Mission context contains neither a group nor a drone target.");
+        }
+    }
+
+    private ArrayList<DroneIdentity> getDroneIdentities(
             UUID groupUUID, List<DbDrone> drones) {
         ArrayList<DroneIdentity> droneIdentities = new ArrayList<>();
 
@@ -442,6 +521,20 @@ public class CoreService {
                             new DroneIdentity.Home(home.x(), home.y(), home.z())));
         }
         return droneIdentities;
+    }
+
+    private DroneIdentity getDroneIdentity(UUID droneUuid) {
+        DbDrone drone = droneMapper.findByUuid(droneUuid);
+        if (drone == null) {
+            throw new NotFoundException("No drone found with UUID" + droneUuid.toString());
+        }
+
+        DroneHomePositionModel home = drone.getHome_position();
+
+        return new DroneIdentity(
+                drone.getUuid().toString(),
+                new DroneIdentity.Home(home.x(), home.y(), home.z())
+        );
     }
 
     public DroneExecutionStatusResponseModel getThingMissionStatus(
