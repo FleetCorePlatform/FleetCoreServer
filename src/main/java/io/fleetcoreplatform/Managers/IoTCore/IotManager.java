@@ -3,6 +3,8 @@ package io.fleetcoreplatform.Managers.IoTCore;
 import io.fleetcoreplatform.Configs.ApplicationConfig;
 import io.fleetcoreplatform.Managers.IoTCore.Enums.MissionDocumentEnums;
 import io.fleetcoreplatform.Models.DroneStatusModel;
+import io.fleetcoreplatform.Models.DroneTarget;
+import io.fleetcoreplatform.Models.GroupTarget;
 import io.fleetcoreplatform.Models.IoTCertContainer;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -136,6 +138,17 @@ public class IotManager {
         DescribeThingGroupResponse response = future.join();
 
         return response.thingGroupArn();
+    }
+
+    public String getThingARN(String thingName) {
+        DescribeThingRequest describeThingRequest =
+                DescribeThingRequest.builder().thingName(thingName).build();
+
+        CompletableFuture<DescribeThingResponse> future =
+                iotAsyncClient.describeThing(describeThingRequest);
+        DescribeThingResponse response = future.join();
+
+        return response.thingArn();
     }
 
     public IoTCertContainer generateCertificate() {
@@ -404,7 +417,7 @@ public class IotManager {
     }
 
     public void createIoTJob(
-            String groupARN,
+            GroupTarget target,
             MissionDocumentEnums action,
             String jobName,
             String downloadUrl,
@@ -417,7 +430,7 @@ public class IotManager {
         CreateJobRequest createJobRequest =
                 CreateJobRequest.builder()
                         .jobId(jobName)
-                        .targets(groupARN)
+                        .targets(target.arn())
                         .targetSelection(TargetSelection.SNAPSHOT)
                         .document(jobDocument)
                         .build();
@@ -427,6 +440,43 @@ public class IotManager {
                 (jobResponse, ex) -> {
                     if (jobResponse != null && jobResponse.sdkHttpResponse().isSuccessful()) {
                         System.out.println("New job was successfully created.");
+                    } else {
+                        Throwable cause = ex.getCause();
+                        if (cause instanceof IotException) {
+                            System.err.println(
+                                    ((IotException) cause).awsErrorDetails().errorMessage());
+                        } else {
+                            System.err.println("Unexpected error: " + cause.getMessage());
+                        }
+                    }
+                });
+
+        future.join();
+    }
+
+    public void createIoTJob(
+            DroneTarget target,
+            MissionDocumentEnums action,
+            String jobName,
+            String downloadUrl,
+            String filePath,
+            String outpost,
+            String bucket) {
+        String jobDocument = IotDocumentBuilder.buildJobDocument(action, jobName, downloadUrl, filePath, outpost, "solo", bucket);
+
+        CreateJobRequest createJobRequest =
+                CreateJobRequest.builder()
+                        .jobId(jobName)
+                        .targets(target.arn())
+                        .targetSelection(TargetSelection.SNAPSHOT)
+                        .document(jobDocument)
+                        .build();
+
+        CompletableFuture<CreateJobResponse> future = iotAsyncClient.createJob(createJobRequest);
+        future.whenComplete(
+                (jobResponse, ex) -> {
+                    if (jobResponse != null && jobResponse.sdkHttpResponse().isSuccessful()) {
+                        System.out.println("New solo job was successfully created.");
                     } else {
                         Throwable cause = ex.getCause();
                         if (cause instanceof IotException) {
