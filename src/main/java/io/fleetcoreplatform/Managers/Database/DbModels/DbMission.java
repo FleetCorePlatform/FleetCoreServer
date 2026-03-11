@@ -6,6 +6,7 @@ import java.util.UUID;
 public class DbMission {
     private UUID uuid;
     private UUID group_uuid;
+    private UUID drone_uuid;
     private String name;
     private String bundle_url;
     private Timestamp start_time;
@@ -25,6 +26,14 @@ public class DbMission {
 
     public void setGroup_uuid(UUID group_uuid) {
         this.group_uuid = group_uuid;
+    }
+
+    public UUID getDrone_uuid() {
+        return drone_uuid;
+    }
+
+    public void setDrone_uuid(UUID drone_uuid) {
+        this.drone_uuid = drone_uuid;
     }
 
     public String getName() {
