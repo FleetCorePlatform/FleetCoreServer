@@ -14,6 +14,7 @@ import io.fleetcoreplatform.Models.UpdateGroupModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -40,6 +41,7 @@ import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/groups")
+@RolesAllowed("${allowed.role-name}")
 @Tag(name = "Groups", description = "Operations related to drone groups")
 public class GroupsEndpoint {
     @Inject GroupMapper groupMapper;

@@ -8,6 +8,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.DroneMapper;
 import io.fleetcoreplatform.Models.MaintenanceCreateRequestModel;
 import io.fleetcoreplatform.Models.MaintenanceSummary;
 import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
@@ -31,6 +32,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @NoCache
 @Path("/api/v1/maintenance")
+@RolesAllowed("${allowed.role-name}")
 @Tag(name = "Maintenance", description = "Operations related to drone maintenance")
 public class MaintenanceEndpoint {
     @Inject SecurityIdentity identity;

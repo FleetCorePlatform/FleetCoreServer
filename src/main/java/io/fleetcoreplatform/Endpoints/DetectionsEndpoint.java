@@ -6,6 +6,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.DetectionsMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
 import io.fleetcoreplatform.Models.DetectionValidationRequestModel;
 import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PATCH;
@@ -28,6 +29,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/api/v1/detections")
+@RolesAllowed("${allowed.role-name}")
 @Tag(name = "Detections", description = "Operations related to drone detections")
 public class DetectionsEndpoint {
     @Inject DetectionsMapper detectionsMapper;

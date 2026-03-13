@@ -13,6 +13,7 @@ import io.fleetcoreplatform.Models.OutpostSummary;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -37,10 +38,8 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 
-// TODO: Implement row-level authentication on outposts endpoint (#28)
-
 @Path("/api/v1/outposts")
-// @RolesAllowed("${allowed.role-name}")
+@RolesAllowed("${allowed.role-name}")
 @Tag(name = "Outposts", description = "Operations related to outpost management")
 public class OutpostsEndpoint {
     @Inject OutpostMapper outpostMapper;
@@ -79,7 +78,6 @@ public class OutpostsEndpoint {
         }
     }
 
-    // TODO: Implement OutpostsEndpoint (#24)
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)

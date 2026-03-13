@@ -7,6 +7,7 @@ import io.fleetcoreplatform.Models.CoordinatorRequestModel;
 import io.fleetcoreplatform.Models.UpdateCoordinatorModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.smallrye.faulttolerance.api.RateLimit;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -27,7 +28,7 @@ import org.jboss.resteasy.reactive.NoCache;
 
 @NoCache
 @Path("/api/v1/coordinators")
-//@RolesAllowed("${allowed.superadmin.role-name}")
+@RolesAllowed("${allowed.superadmin.role-name}")
 @Tag(name = "Coordinators", description = "Operations related to coordinator management")
 public class CoordinatorsEndpoint {
 
