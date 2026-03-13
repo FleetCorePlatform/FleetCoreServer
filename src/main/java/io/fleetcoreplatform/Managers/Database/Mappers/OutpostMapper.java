@@ -105,4 +105,12 @@ public interface OutpostMapper {
         @Param("uuid") UUID uuid,
         @Param("area") String area
     );
+    
+    @Update(
+        "UPDATE outposts SET name = #{name} WHERE uuid = #{uuid, jdbcType=OTHER}"
+    )
+    void updateName(
+        @Param("uuid") UUID uuid,
+        @Param("name") String name
+    );
 }

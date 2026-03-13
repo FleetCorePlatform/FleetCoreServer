@@ -10,11 +10,10 @@ import io.fleetcoreplatform.Managers.SQS.SqsManager;
 import io.fleetcoreplatform.Models.DroneSummaryModel;
 import io.fleetcoreplatform.Models.DroneTelemetryModel;
 import io.fleetcoreplatform.Models.GroupRequestModel;
-import io.fleetcoreplatform.Models.UpdateGroupOutpostModel;
+import io.fleetcoreplatform.Models.UpdateGroupModel;
 import io.fleetcoreplatform.Services.CoreService;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
-import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -241,19 +240,28 @@ public class GroupsEndpoint {
     })
     public Response updateGroup(
             @Parameter(description = "UUID of the group", required = true)
-            @PathParam("group_uuid") UUID group_uuid,
+            @PathParam("group_uuid") UUID groupUuid,
             @RequestBody(description = "Update details", required = true)
-            UpdateGroupOutpostModel body) {
-        if (body == null || body.outpost_uuid() == null) {
+            UpdateGroupModel body) {
+        if (body == null || body.groupName() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
         try {
-            coreService.updateGroup(group_uuid, body);
+            String cognitoSub = identity.getPrincipal().getName();
+
+            DbGroup group = groupMapper.findByUuidAndCoordinator(groupUuid, cognitoSub);
+            if (group == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            int modified = groupMapper.changeName(groupUuid, body.groupName());
+
+            if (modified == 0) {
+                return Response.notModified().build();
+            }
 
             return Response.noContent().build();
-        } catch (NotFoundException nfe) {
-            return Response.status(Response.Status.NOT_FOUND).build();
         } catch (Exception e) {
             logger.error(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();

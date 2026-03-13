@@ -7,7 +7,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.GroupMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.OutpostMapper;
 import io.fleetcoreplatform.Models.CreateOutpostModel;
-import io.fleetcoreplatform.Models.OutpostGeofenceUpdateRequest;
+import io.fleetcoreplatform.Models.OutpostUpdateRequest;
 import io.fleetcoreplatform.Models.OutpostGroupSummary;
 import io.fleetcoreplatform.Models.OutpostSummary;
 import io.fleetcoreplatform.Services.CoreService;
@@ -186,24 +186,24 @@ public class OutpostsEndpoint {
         }
     }
 
-    @PUT
+    @PATCH
     @Path("/{outpost-uuid}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Edit outpost geofence", description = "Update the geofence area of an outpost")
+    @Operation(summary = "Edit outpost details", description = "Update an outpost")
     @APIResponses(value = {
-        @APIResponse(responseCode = "204", description = "Geofence updated successfully"),
+        @APIResponse(responseCode = "204", description = "Outpost updated successfully"),
         @APIResponse(responseCode = "400", description = "Invalid request body"),
         @APIResponse(responseCode = "404", description = "Outpost not found"),
         @APIResponse(responseCode = "500", description = "Internal server error")
     })
-    public Response editOutpostGeofence(
+    public Response editOutpost(
         @Parameter(description = "UUID of the outpost", required = true)
         @PathParam("outpost-uuid") UUID outpostUuid,
         @RequestBody(description = "Geofence update details", required = true)
-        OutpostGeofenceUpdateRequest body
+        OutpostUpdateRequest body
     ) {
-        if (outpostUuid == null || body == null || body.area() == null) {
+        if (outpostUuid == null || body == null || body.area() == null && body.name() == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 
@@ -216,7 +216,12 @@ public class OutpostsEndpoint {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
-            outpostMapper.updateArea(outpostUuid, body.area());
+            if (body.area() != null) {
+                outpostMapper.updateArea(outpostUuid, body.area());
+            }
+            if (body.name() != null) {
+                outpostMapper.updateName(outpostUuid, body.name());
+            }
 
             return Response.noContent().build();
 

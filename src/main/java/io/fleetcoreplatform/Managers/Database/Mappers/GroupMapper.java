@@ -23,6 +23,18 @@ public interface GroupMapper {
     @Select("SELECT * FROM groups WHERE uuid = #{uuid, jdbcType=OTHER}")
     DbGroup findByUuid(@Param("uuid") UUID uuid);
 
+    @Select("""
+        SELECT g.* FROM groups g
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON o.created_by = c.uuid
+        WHERE g.uuid = #{groupUuid, jdbcType=OTHER}
+          AND c.cognito_sub = #{cognitoSub}
+    """)
+    DbGroup findByUuidAndCoordinator(
+            @Param("groupUuid") UUID groupUuid,
+            @Param("cognitoSub") String cognitoSub
+    );
+
     @Select("SELECT * FROM groups WHERE outpost_uuid = #{outpost_uuid, jdbcType=OTHER}")
     List<DbGroup> listGroupsByOutpostUuid(@Param("outpost_uuid") UUID uuid);
 
@@ -48,6 +60,12 @@ public interface GroupMapper {
             @Param("outpost_uuid") UUID outpost_uuid,
             @Param("name") String name,
             @Param("created_at") Timestamp created_at);
+
+    @Update("UPDATE groups SET name = #{groupName} WHERE uuid = #{uuid, jdbcType=OTHER}")
+    int changeName(
+            @Param("uuid") UUID uuid,
+            @Param("groupName") String groupName
+    );
 
     @Update(
             "UPDATE groups SET outpost_uuid = #{outpost_uuid, jdbcType=OTHER} WHERE uuid = #{uuid,"
