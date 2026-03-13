@@ -19,15 +19,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          server-id: github
+          settings-path: ${{ github.workspace }}
 
       - name: Build the target
         run: mvn install -Dspotless.check.skip=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Swagger UI
         uses: Legion2/swagger-ui-action@v1
         with:
           output: swagger-ui
-          spec-file: openapi.json
+          spec-file: target/openapi.json
           version: 5.x
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
