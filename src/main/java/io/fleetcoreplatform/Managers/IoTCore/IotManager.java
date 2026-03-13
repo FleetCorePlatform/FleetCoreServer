@@ -18,6 +18,7 @@ import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.iot.IotAsyncClient;
 import software.amazon.awssdk.services.iot.model.*;
+import software.amazon.awssdk.services.iot.transform.CreateJobRequestMarshaller;
 import software.amazon.awssdk.services.sts.StsClient;
 
 @ApplicationScoped
@@ -50,6 +51,21 @@ public class IotManager {
 
     public IotAsyncClient getClient() {
         return iotAsyncClient;
+    }
+
+    public void updateCertificate(String certificateARN, CertificateStatus status) throws CompletionException {
+        String certificateId = certificateARN.split("/")[1];
+
+        UpdateCertificateRequest request = UpdateCertificateRequest.builder()
+                .certificateId(certificateId)
+                .newStatus(status)
+                .build();
+
+        try {
+            iotAsyncClient.updateCertificate(request);
+        } catch (IotException e) {
+            throw new CompletionException("Failed to activate certificate: " + certificateId, e);
+        }
     }
 
     public String createPolicy(String thingName) throws CompletionException {
@@ -417,6 +433,53 @@ public class IotManager {
     }
 
     public void createIoTJob(
+            List<String> targets,
+            MissionDocumentEnums action,
+            String jobName,
+            String downloadUrl,
+            String filePath,
+            String outpost,
+            String group,
+            String bucket,
+            String scheduled) {
+        String jobDocument = IotDocumentBuilder.buildJobDocument(action, jobName, downloadUrl, filePath, outpost, group, bucket);
+
+        CreateJobRequest.Builder createJobRequestBuilder =
+                CreateJobRequest.builder()
+                        .jobId(jobName)
+                        .targets(targets)
+                        .targetSelection(TargetSelection.SNAPSHOT)
+                        .document(jobDocument);
+
+        CreateJobRequest createJobRequest = switch (scheduled) {
+            case null -> createJobRequestBuilder.build();
+            default -> createJobRequestBuilder
+                    .schedulingConfig(SchedulingConfig.builder()
+                            .startTime(scheduled)
+                            .build())
+                    .build();
+        };
+
+        CompletableFuture<CreateJobResponse> future = iotAsyncClient.createJob(createJobRequest);
+        future.whenComplete(
+                (jobResponse, ex) -> {
+                    if (jobResponse != null && jobResponse.sdkHttpResponse().isSuccessful()) {
+                        System.out.println("New subset job was successfully created.");
+                    } else {
+                        Throwable cause = ex.getCause();
+                        if (cause instanceof IotException) {
+                            System.err.println(
+                                    ((IotException) cause).awsErrorDetails().errorMessage());
+                        } else {
+                            System.err.println("Unexpected error: " + cause.getMessage());
+                        }
+                    }
+                });
+
+        future.join();
+    }
+
+    public void createIoTJob(
             GroupTarget target,
             MissionDocumentEnums action,
             String jobName,
@@ -424,16 +487,25 @@ public class IotManager {
             String filePath,
             String outpost,
             String group,
-            String bucket) {
+            String bucket,
+            String scheduled) {
         String jobDocument = IotDocumentBuilder.buildJobDocument(action, jobName, downloadUrl, filePath, outpost, group, bucket);
 
-        CreateJobRequest createJobRequest =
+        CreateJobRequest.Builder createJobRequestBuilder =
                 CreateJobRequest.builder()
                         .jobId(jobName)
                         .targets(target.arn())
                         .targetSelection(TargetSelection.SNAPSHOT)
-                        .document(jobDocument)
-                        .build();
+                        .document(jobDocument);
+
+        CreateJobRequest createJobRequest = switch (scheduled) {
+            case null -> createJobRequestBuilder.build();
+            default -> createJobRequestBuilder
+                    .schedulingConfig(SchedulingConfig.builder()
+                            .startTime(scheduled)
+                            .build())
+                    .build();
+        };
 
         CompletableFuture<CreateJobResponse> future = iotAsyncClient.createJob(createJobRequest);
         future.whenComplete(
@@ -461,16 +533,25 @@ public class IotManager {
             String downloadUrl,
             String filePath,
             String outpost,
-            String bucket) {
+            String bucket,
+            String scheduled) {
         String jobDocument = IotDocumentBuilder.buildJobDocument(action, jobName, downloadUrl, filePath, outpost, "solo", bucket);
 
-        CreateJobRequest createJobRequest =
+        CreateJobRequest.Builder createJobRequestBuilder =
                 CreateJobRequest.builder()
                         .jobId(jobName)
                         .targets(target.arn())
                         .targetSelection(TargetSelection.SNAPSHOT)
-                        .document(jobDocument)
-                        .build();
+                        .document(jobDocument);
+
+        CreateJobRequest createJobRequest = switch (scheduled) {
+            case null -> createJobRequestBuilder.build();
+            default -> createJobRequestBuilder
+                    .schedulingConfig(SchedulingConfig.builder()
+                            .startTime(scheduled)
+                            .build())
+                    .build();
+        };
 
         CompletableFuture<CreateJobResponse> future = iotAsyncClient.createJob(createJobRequest);
         future.whenComplete(
@@ -551,14 +632,30 @@ public class IotManager {
 
             DescribeThingGroupResponse describeResponse = future.join();
 
-            var attributes = describeResponse.thingGroupProperties().attributePayload().attributes();
-
-            if (attributes != null && !attributes.isEmpty()) {
-                return attributes;
-            } else {
+            var props = describeResponse.thingGroupProperties();
+            if (props == null) {
+                System.err.println("thingGroupProperties is null");
                 return null;
             }
 
+            var payload = props.attributePayload();
+            if (payload == null) {
+                System.err.println("attributePayload is null");
+                return null;
+            }
+
+            var attributes = payload.attributes();
+            System.out.println("attributes: " + attributes);
+
+            return attributes;
+        } catch (CompletionException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof IotException) {
+                System.err.println(((IotException) cause).awsErrorDetails().errorMessage());
+            } else {
+                System.err.println("Unexpected error: " + cause.getMessage());
+            }
+            return null;
         } catch (Exception ex) {
             if (ex instanceof IotException) {
                 System.err.println(
