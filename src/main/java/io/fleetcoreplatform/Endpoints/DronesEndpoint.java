@@ -143,7 +143,6 @@ public class DronesEndpoint {
             @RequestBody(description = "Drone registration details", required = true)
             DroneRequestModel body) {
         if (body == null
-                || body.groupName() == null
                 || body.droneName() == null
                 || body.address() == null
                 || body.agentVersion() == null
@@ -200,7 +199,7 @@ public class DronesEndpoint {
             @Parameter(description = "UUID of the drone", required = true)
             @PathParam("drone_uuid") UUID droneUuid,
             @RequestBody(description = "Drone update details", required = true)
-            DroneRequestModel body) {
+            UpdateDroneModel body) {
         if (body == null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
@@ -264,7 +263,7 @@ public class DronesEndpoint {
         @APIResponse(responseCode = "404", description = "Drone or group not found"),
         @APIResponse(responseCode = "500", description = "Internal server error")
     })
-    public Response ungroupDrone(
+    public Response assignDroneToGroup(
             @Parameter(description = "UUID of the drone", required = true)
             @PathParam("drone_uuid") UUID drone_uuid,
             @RequestBody(description = "Group assignment details", required = true)

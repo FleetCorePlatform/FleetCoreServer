@@ -1,9 +1,10 @@
 package io.fleetcoreplatform.Models;
 
 import java.util.List;
+import java.util.UUID;
 
 public record DroneRequestModel(
-        String groupName,
+        UUID groupName,
         String droneName,
         String address,
         String agentVersion,
