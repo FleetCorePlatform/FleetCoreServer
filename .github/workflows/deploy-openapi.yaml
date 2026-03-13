@@ -24,6 +24,9 @@ jobs:
           java-version: 21
           server-id: github
 
+      - name: Create application.properties
+        run: echo "quarkus.smallrye-openapi.store-schema-directory=target" >> src/main/resources/application.properties
+
       - name: Build the target
         run: mvn install -Dspotless.check.skip=true
         env:
