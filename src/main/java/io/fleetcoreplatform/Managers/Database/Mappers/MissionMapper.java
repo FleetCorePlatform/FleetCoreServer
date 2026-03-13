@@ -13,29 +13,34 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface MissionMapper {
     @Insert(
-            "INSERT INTO missions (uuid, group_uuid, drone_uuid, name, bundle_url, start_time, created_by)"
-                    + " VALUES (#{uuid, jdbcType=OTHER}, #{group_uuid, jdbcType=OTHER}, #{drone_uuid, jdbcType=OTHER}, #{name},"
+            "INSERT INTO missions (uuid, group_uuid, name, bundle_url, start_time, created_by)"
+                    + " VALUES (#{uuid, jdbcType=OTHER}, #{group_uuid, jdbcType=OTHER}, #{name},"
                     + " #{bundle_url}, #{start_time}, #{created_by, jdbcType=OTHER})")
     void insert(
             @Param("uuid") UUID uuid,
             @Param("group_uuid") UUID group_uuid,
-            @Param("drone_uuid") UUID drone_uuid,
             @Param("name") String name,
             @Param("bundle_url") String bundle_url,
             @Param("start_time") Timestamp start_time,
             @Param("created_by") UUID created_by);
 
+    @Insert(
+            "INSERT INTO mission_drones (mission_uuid, drone_uuid)"
+                    + " VALUES (#{mission_uuid, jdbcType=OTHER}, #{drone_uuid, jdbcType=OTHER})")
+    void insertMissionDrone(
+            @Param("mission_uuid") UUID mission_uuid,
+            @Param("drone_uuid") UUID drone_uuid);
+
     @Select("SELECT * FROM missions WHERE uuid = #{uuid, jdbcType=OTHER}")
     DbMission findById(@Param("uuid") UUID uuid);
 
     @Update(
-            "UPDATE missions SET group_uuid = #{group_uuid, jdbcType=OTHER}, drone_uuid = #{drone_uuid, jdbcType=OTHER}, name = #{name},"
+            "UPDATE missions SET group_uuid = #{group_uuid, jdbcType=OTHER}, name = #{name},"
                     + " bundle_url = #{bundle_url}, start_time = #{start_time}, created_by ="
                     + " #{created_by, jdbcType=OTHER} WHERE uuid = #{uuid, jdbcType=OTHER}")
     void update(
             @Param("uuid") UUID uuid,
             @Param("group_uuid") UUID group_uuid,
-            @Param("drone_uuid") UUID drone_uuid,
             @Param("name") String name,
             @Param("bundle_url") String bundle_url,
             @Param("start_time") Timestamp start_time,
@@ -71,7 +76,7 @@ public interface MissionMapper {
         FROM missions m
         INNER JOIN groups g ON m.group_uuid = g.uuid
         INNER JOIN outposts o ON g.outpost_uuid = o.uuid
-        INNER JOIN coordinators c ON o.created_by = c.uuid
+        INNER JOIN coordinators c ON m.created_by = c.uuid
         LEFT JOIN detections d ON m.uuid = d.mission_uuid
         WHERE
             g.uuid = #{groupUuid, jdbcType=OTHER}
@@ -92,7 +97,8 @@ public interface MissionMapper {
             d.uuid AS droneUuid,
             d.name AS droneName
         FROM missions m
-        INNER JOIN drones d ON m.drone_uuid = d.uuid
+        INNER JOIN mission_drones md ON m.uuid = md.mission_uuid
+        INNER JOIN drones d ON md.drone_uuid = d.uuid
         INNER JOIN groups g ON d.group_uuid = g.uuid
         INNER JOIN outposts o ON g.outpost_uuid = o.uuid
         INNER JOIN coordinators c ON m.created_by = c.uuid
@@ -112,17 +118,19 @@ public interface MissionMapper {
         SELECT
             m.uuid as missionUuid,
             m.group_uuid as groupUuid,
-            m.drone_uuid as droneUuid,
+            CASE WHEN m.group_uuid IS NULL THEN md.drone_uuid ELSE NULL END as droneUuid,
             COALESCE(o1.uuid, o2.uuid) as outpostUuid
         FROM missions m
         LEFT JOIN groups g1 ON m.group_uuid = g1.uuid
         LEFT JOIN outposts o1 ON g1.outpost_uuid = o1.uuid
-        LEFT JOIN drones d ON m.drone_uuid = d.uuid
+        LEFT JOIN mission_drones md ON m.uuid = md.mission_uuid AND m.group_uuid IS NULL
+        LEFT JOIN drones d ON md.drone_uuid = d.uuid
         LEFT JOIN groups g2 ON d.group_uuid = g2.uuid
         LEFT JOIN outposts o2 ON g2.outpost_uuid = o2.uuid
         INNER JOIN coordinators c ON m.created_by = c.uuid
         WHERE m.uuid = #{missionUuid, jdbcType=OTHER}
           AND c.cognito_sub = #{cognitoSub}
+        LIMIT 1
     """)
     MissionCancellationContext findCancellationContext(
             @Param("missionUuid") UUID missionUuid,
@@ -158,4 +166,30 @@ public interface MissionMapper {
         WHERE c.cognito_sub = #{cognitoSub}
     """)
     int countMissionsByCoordinator(String cognitoSub);
+
+
+    @Select("""
+        SELECT
+            m.name,
+            m.uuid AS missionUuid,
+            m.start_time AS startTime,
+            COUNT(det.uuid) AS detectionCount,
+            d.uuid AS droneUuid,
+            d.name AS droneName
+        FROM missions m
+        INNER JOIN mission_drones md ON m.uuid = md.mission_uuid
+        INNER JOIN drones d ON md.drone_uuid = d.uuid
+        INNER JOIN groups g ON d.group_uuid = g.uuid
+        INNER JOIN outposts o ON g.outpost_uuid = o.uuid
+        INNER JOIN coordinators c ON m.created_by = c.uuid
+        LEFT JOIN detections det ON m.uuid = det.mission_uuid
+        WHERE
+            g.uuid = #{groupUuid, jdbcType=OTHER}
+            AND c.cognito_sub = #{cognitoSub}
+        GROUP BY m.uuid, m.name, m.start_time, d.uuid, d.name
+    """)
+    List<SoloMissionSummary> selectSoloMissionSummariesByGroupAndCoordinator(
+        @Param("groupUuid") UUID groupUuid,
+        @Param("cognitoSub") String cognitoSub
+    );
 }

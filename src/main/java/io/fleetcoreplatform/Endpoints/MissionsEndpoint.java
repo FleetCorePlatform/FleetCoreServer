@@ -5,6 +5,7 @@ import io.fleetcoreplatform.Managers.Database.Mappers.CoordinatorMapper;
 import io.fleetcoreplatform.Managers.Database.Mappers.MissionMapper;
 import io.fleetcoreplatform.Models.*;
 import io.fleetcoreplatform.Services.CoreService;
+import io.fleetcoreplatform.Utils.IoTJobSchedulerValidator;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.annotation.security.RolesAllowed;
@@ -41,10 +42,11 @@ public class MissionsEndpoint {
     @Inject Logger logger;
 
     @POST
+    @Path("/group")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @RateLimit(value = 2, window = 10, windowUnit = ChronoUnit.MINUTES)
-    @Operation(summary = "Create mission", description = "Create a full survey, subset survey, or solo manual mission")
+    @Operation(summary = "Create group mission", description = "Create a full survey or subset survey for a group")
     @APIResponses(value = {
         @APIResponse(responseCode = "200", description = "Mission created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = MissionCreatedResponseModel.class))),
         @APIResponse(responseCode = "400", description = "Invalid request body"),
@@ -52,11 +54,11 @@ public class MissionsEndpoint {
         @APIResponse(responseCode = "404", description = "Resource not found"),
         @APIResponse(responseCode = "500", description = "Internal server error")
     })
-    public Response createMission(
-            @RequestBody(description = "Mission creation details", required = true)
-            CreateMissionRequestModel body) {
+    public Response createGroupMission(
+            @RequestBody(description = "Group mission creation details", required = true)
+            CreateGroupMissionRequestModel body) {
 
-        if (body == null || body.jobName() == null || body.jobName().length() > 64) {
+        if (body == null || body.jobName() == null || body.jobName().length() > 64 || body.groupUuid() == null || body.outpostUuid() == null) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Invalid basic parameters").build();
         }
 
@@ -67,31 +69,66 @@ public class MissionsEndpoint {
         }
 
         try {
-            UUID missionUUID;
-            if (body.groupUuid() != null && body.outpostUuid() != null && body.waypoints() == null) {
-                missionUUID = coreService.createGroupMission(
-                        body.outpostUuid(),
-                        body.groupUuid(),
-                        body.droneUuids(),
-                        coordinator.getUuid(),
-                        body.altitude(),
-                        body.jobName());
-            }
-            else if (body.droneUuids() != null && body.droneUuids().size() == 1 && body.waypoints() != null) {
-                int speed = body.speed() != null ? body.speed() : 10;
-                missionUUID = coreService.createSoloMission(
-                        body.waypoints(),
-                        body.droneUuids().getFirst(),
-                        coordinator.getUuid(),
-                        body.altitude(),
-                        body.jobName(),
-                        speed);
-            }
-            else {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("Payload must strictly define either a group survey or a solo manual mission.")
-                        .build();
-            }
+            UUID missionUUID = coreService.createGroupMission(
+                    body.outpostUuid(),
+                    body.groupUuid(),
+                    body.droneUuids(),
+                    coordinator.getUuid(),
+                    body.altitude(),
+                    body.jobName(),
+                    body.scheduled());
+
+            return Response.ok(new MissionCreatedResponseModel(missionUUID)).build();
+
+        } catch (NotFoundException nfe) {
+            return Response.status(Response.Status.NOT_FOUND).entity(nfe.getMessage()).build();
+        } catch (IotException ioe) {
+            return Response.status(500, "Server internal error while bundling mission instructions").build();
+        } catch (Exception e) {
+            logger.errorf("Unexpected error while creating mission: %s", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @POST
+    @Path("/solo")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @RateLimit(value = 2, window = 10, windowUnit = ChronoUnit.MINUTES)
+    @Operation(summary = "Create solo mission", description = "Create a solo manual mission for a drone")
+    @APIResponses(value = {
+        @APIResponse(responseCode = "200", description = "Mission created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = MissionCreatedResponseModel.class))),
+        @APIResponse(responseCode = "400", description = "Invalid request body"),
+        @APIResponse(responseCode = "401", description = "Unauthorized"),
+        @APIResponse(responseCode = "404", description = "Resource not found"),
+        @APIResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Response createSoloMission(
+            @RequestBody(description = "Solo mission creation details", required = true)
+            CreateSoloMissionRequestModel body) {
+
+        if (body == null || body.jobName() == null || body.jobName().length() > 64 || body.droneUuid() == null || body.waypoints() == null || body.waypoints().length == 0 || body.scheduled() != null && !IoTJobSchedulerValidator.isValidStartTime(body.scheduled())) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Invalid basic parameters").build();
+        }
+
+        String cognitoSub = identity.getPrincipal().getName();
+        DbCoordinator coordinator = coordinatorMapper.findByCognitoSub(cognitoSub);
+        if (coordinator == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
+
+        try {
+            int speed = body.speed() != null ? body.speed() : 10;
+            boolean rtl = body.returnToLaunch() != null ? body.returnToLaunch() : true;
+            UUID missionUUID = coreService.createSoloMission(
+                    body.waypoints(),
+                    body.droneUuid(),
+                    coordinator.getUuid(),
+                    body.altitude(),
+                    body.jobName(),
+                    speed,
+                    rtl,
+                    body.scheduled());
 
             return Response.ok(new MissionCreatedResponseModel(missionUUID)).build();
 
@@ -294,18 +331,18 @@ public class MissionsEndpoint {
     })
     public Response getAllSoloMissionSummariesForOutpost(
             @Parameter(description = "UUID of the outpost", required = true)
-            @QueryParam("outpost_uuid") UUID outpostUuid) {
+            @QueryParam("group_uuid") UUID groupUuid) {
 
-        if (outpostUuid == null) {
+        if (groupUuid == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("Provide outpost_uuid")
+                    .entity("Provide group_uuid")
                     .build();
         }
 
         String cognitoSub = identity.getPrincipal().getName();
 
         try {
-            List<SoloMissionSummary> missions = missionMapper.selectSoloMissionSummariesByOutpostAndCoordinator(outpostUuid, cognitoSub);
+            List<SoloMissionSummary> missions = missionMapper.selectSoloMissionSummariesByGroupAndCoordinator(groupUuid, cognitoSub);
 
             if (missions == null || missions.isEmpty()) {
                 return Response.status(Response.Status.NO_CONTENT).build();
