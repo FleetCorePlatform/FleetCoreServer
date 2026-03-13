@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: read
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -20,7 +23,6 @@ jobs:
           distribution: temurin
           java-version: 21
           server-id: github
-          settings-path: ${{ github.workspace }}
 
       - name: Build the target
         run: mvn install -Dspotless.check.skip=true
