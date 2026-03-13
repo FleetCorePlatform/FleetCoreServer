@@ -1,7 +1,7 @@
 package io.fleetcoreplatform.Managers.Database.DbModels;
 
 import io.fleetcoreplatform.Models.OutpostAreaModel;
-import io.fleetcoreplatform.Models.PolygonPoint2DModel;
+import io.fleetcoreplatform.Models.PolygonPoint2D;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -56,11 +56,11 @@ public class DbOutpost {
     }
 
     public void setArea(Geometry area) {
-        List<PolygonPoint2DModel> points = new ArrayList<>();
+        List<PolygonPoint2D> points = new ArrayList<>();
 
         for (int i = 0; i < area.numPoints(); i++) {
             Point point = area.getPoint(i);
-            points.add(new PolygonPoint2DModel(point.x, point.y));
+            points.add(new PolygonPoint2D(point.x, point.y));
         }
 
         this.area = new OutpostAreaModel(points);

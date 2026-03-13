@@ -1,6 +1,6 @@
 package io.fleetcoreplatform.Managers.Database.TypeHandlers;
 
-import io.fleetcoreplatform.Models.PolygonPoint2DModel;
+import io.fleetcoreplatform.Models.PolygonPoint2D;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedTypes;
@@ -13,32 +13,32 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-@MappedTypes(PolygonPoint2DModel.class)
-public class PolygonPointTypeHandler extends BaseTypeHandler<PolygonPoint2DModel> {
+@MappedTypes(PolygonPoint2D.class)
+public class PolygonPointTypeHandler extends BaseTypeHandler<PolygonPoint2D> {
 
     @Override
-    public void setNonNullParameter(PreparedStatement ps, int i, PolygonPoint2DModel parameter, JdbcType jdbcType) throws SQLException {
+    public void setNonNullParameter(PreparedStatement ps, int i, PolygonPoint2D parameter, JdbcType jdbcType) throws SQLException {
         Point point = new Point(parameter.x(), parameter.y());
         point.setSrid(4326);
         ps.setObject(i, new PGgeometry(point));
     }
 
     @Override
-    public PolygonPoint2DModel getNullableResult(ResultSet rs, String columnName) throws SQLException {
+    public PolygonPoint2D getNullableResult(ResultSet rs, String columnName) throws SQLException {
         return convertToModel(rs.getObject(columnName));
     }
 
     @Override
-    public PolygonPoint2DModel getNullableResult(ResultSet rs, int columnIndex) throws SQLException {
+    public PolygonPoint2D getNullableResult(ResultSet rs, int columnIndex) throws SQLException {
         return convertToModel(rs.getObject(columnIndex));
     }
 
     @Override
-    public PolygonPoint2DModel getNullableResult(CallableStatement cs, int columnIndex) throws SQLException {
+    public PolygonPoint2D getNullableResult(CallableStatement cs, int columnIndex) throws SQLException {
         return convertToModel(cs.getObject(columnIndex));
     }
 
-    private PolygonPoint2DModel convertToModel(Object obj) throws SQLException {
+    private PolygonPoint2D convertToModel(Object obj) throws SQLException {
         if (obj == null) return null;
 
         Geometry geometry = null;
@@ -54,7 +54,7 @@ public class PolygonPointTypeHandler extends BaseTypeHandler<PolygonPoint2DModel
         }
 
         if (geometry instanceof Point p) {
-            return new PolygonPoint2DModel(p.getX(), p.getY());
+            return new PolygonPoint2D(p.getX(), p.getY());
         }
 
         return null;
