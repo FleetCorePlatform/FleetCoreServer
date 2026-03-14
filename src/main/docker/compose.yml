@@ -1,0 +1,38 @@
+services:
+  server:
+    container_name: FleetCoreServer
+    restart: unless-stopped
+    image: ghcr.io/FleetCoreServer:latest
+    ports:
+      - "8080:8080"
+    environment:
+      QUARKUS_DEVSERVICES_ENABLED: "false"
+      QUARKUS_HTTP_HOST: "0.0.0.0"
+      QUARKUS_HTTP_PORT: "8080"
+      AWS_REGION: "region"
+      QUARKUS_DATASOURCE_DB_KIND: "postgresql"
+      QUARKUS_DATASOURCE_JDBC_URL: "jdbc:postgresql://dbname.identifier.region.rds.amazonaws.com:5432/database"
+      QUARKUS_DATASOURCE_USERNAME: "User"
+      QUARKUS_DATASOURCE_PASSWORD: "Password"
+      QUARKUS_DATASOURCE_HEALTH_ENABLED: "false"
+      AWS_IOT_THING_TYPE: "drone_thing"
+      AWS_IOT_PUBSUB_CLIENT_ID: "pubsub_client"
+      AWS_IOT_ROLE_ALIAS: "role_alias_for_kvs_access"
+      AWS_S3_BUCKET_NAME: "example-bucket-name"
+      AWS_SQS_QUEUE_NAME: "example-queue-name"
+      AWS_COGNITO_USER_POOL_ID: "pool-id"
+      QUARKUS_OIDC_AUTH_SERVER_URL: "https://cognito-idp.region.amazonaws.com/pool-id"
+      QUARKUS_OIDC_TOKEN_ISSUER: "https://cognito-idp.region.amazonaws.com/pool-id"
+      QUARKUS_OIDC_APPLICATION_TYPE: "service"
+      QUARKUS_OIDC_AUTHENTICATION_VERIFY_ACCESS_TOKEN: "true"
+      QUARKUS_OIDC_ROLES_ROLE_CLAIM_PATH: "cognito:groups"
+      ALLOWED_ROLE_NAME: "aws_cognito_group_name"
+      ALLOWED_SUPERADMIN_ROLE_NAME: "system_admin_name"
+      AWS_KINESIS_REGION: "kinesis_region"
+      QUARKUS_LOG_CLOUDWATCH_ENABLED: "true"
+      QUARKUS_LOG_CLOUDWATCH_DEFAULT_CREDENTIALS_PROVIDER_ENABLED: "true"
+      QUARKUS_LOG_CLOUDWATCH_REGION: "region"
+      QUARKUS_LOG_CLOUDWATCH_LOG_GROUP: "log_group_name"
+      QUARKUS_LOG_CLOUDWATCH_LOG_STREAM_NAME: "stream_name"
+      QUARKUS_LOG_CLOUDWATCH_LEVEL: "WARN"
+      MYBATIS_TYPE_HANDLERS_PACKAGE: "io.levysworks.Managers.Database.TypeHandlers"
