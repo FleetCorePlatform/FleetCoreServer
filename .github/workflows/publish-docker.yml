@@ -28,8 +28,6 @@ jobs:
           java-version: '21'
           distribution: 'graalvm'
           server-id: github
-          server-username: ${{ github.actor }}
-          server-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Quarkus native executable
         run: ./mvnw install -Pnative -Dspotless.check.skip=true
