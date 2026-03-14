@@ -15,7 +15,7 @@ jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -28,6 +28,10 @@ jobs:
           java-version: '21'
           distribution: 'graalvm'
           server-id: github
+
+      - name: Extract Maven project version
+        id: pom_version
+        run: echo "VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
 
       - name: Build Quarkus native executable
         run: ./mvnw install -Pnative -Dspotless.check.skip=true
@@ -48,11 +52,15 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=${{ steps.pom_version.outputs.VERSION }}
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=FleetCoreServer container. Refer to the repository README for the required compose.yml environment variables.
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -62,3 +70,11 @@ jobs:
           push: ${{ !env.ACT }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Create GitHub Release
+        if: ${{ !env.ACT }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.pom_version.outputs.VERSION }}
+          name: ${{ steps.pom_version.outputs.VERSION }}
+          generate_release_notes: true

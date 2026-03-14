@@ -2,14 +2,16 @@ services:
   server:
     container_name: FleetCoreServer
     restart: unless-stopped
-    image: ghcr.io/FleetCoreServer:latest
+    image: ghcr.io/fleetcoreplatform/fleetcoreserver:release_version # Change to the latest available release version
     ports:
       - "8080:8080"
     environment:
+      AWS_ACCESS_KEY_ID: "access_key_id"
+      AWS_SECRET_ACCESS_KEY: "secret_access_key"
+      AWS_REGION: "region"
       QUARKUS_DEVSERVICES_ENABLED: "false"
       QUARKUS_HTTP_HOST: "0.0.0.0"
       QUARKUS_HTTP_PORT: "8080"
-      AWS_REGION: "region"
       QUARKUS_DATASOURCE_DB_KIND: "postgresql"
       QUARKUS_DATASOURCE_JDBC_URL: "jdbc:postgresql://dbname.identifier.region.rds.amazonaws.com:5432/database"
       QUARKUS_DATASOURCE_USERNAME: "User"
